@@ -10,6 +10,8 @@
 
 English | [简体中文](./README_zh.md)
 
+Donfly study project.
+
 KubeEdge is built upon Kubernetes and extends native containerized application orchestration and device management to hosts at the Edge.
 It consists of cloud part and edge part, provides core infrastructure support for networking, application deployment and metadata synchronization
 between cloud and edge. It also supports **MQTT** which enables edge devices to access through edge nodes.
