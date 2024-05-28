@@ -14,20 +14,23 @@ import (
 	"k8s.io/klog/v2"
 
 	dbInflux "github.com/kubeedge/Template/data/dbmethod/influxdb2"
+	dbMysql "github.com/kubeedge/Template/data/dbmethod/mysql"
+	dbRedis "github.com/kubeedge/Template/data/dbmethod/redis"
+	dbTdengine "github.com/kubeedge/Template/data/dbmethod/tdengine"
 	httpMethod "github.com/kubeedge/Template/data/publish/http"
 	mqttMethod "github.com/kubeedge/Template/data/publish/mqtt"
+	"github.com/kubeedge/Template/data/stream"
 	"github.com/kubeedge/Template/driver"
-	"github.com/kubeedge/Template/pkg/common"
-	"github.com/kubeedge/Template/pkg/config"
-	"github.com/kubeedge/Template/pkg/global"
-	"github.com/kubeedge/Template/pkg/util/parse"
+	dmiapi "github.com/kubeedge/kubeedge/pkg/apis/dmi/v1beta1"
+	"github.com/kubeedge/mapper-framework/pkg/common"
+	"github.com/kubeedge/mapper-framework/pkg/global"
+	"github.com/kubeedge/mapper-framework/pkg/util/parse"
 )
 
 type DevPanel struct {
 	deviceMuxs   map[string]context.CancelFunc
 	devices      map[string]*driver.CustomizedDev
 	models       map[string]common.DeviceModel
-	protocols    map[string]common.ProtocolConfig
 	wg           sync.WaitGroup
 	serviceMutex sync.Mutex
 	quitChan     chan os.Signal
@@ -38,6 +41,8 @@ var (
 	once     sync.Once
 )
 
+var ErrEmptyData = errors.New("device or device model list is empty")
+
 // NewDevPanel init and return devPanel
 func NewDevPanel() *DevPanel {
 	once.Do(func() {
@@ -45,7 +50,6 @@ func NewDevPanel() *DevPanel {
 			deviceMuxs:   make(map[string]context.CancelFunc),
 			devices:      make(map[string]*driver.CustomizedDev),
 			models:       make(map[string]common.DeviceModel),
-			protocols:    make(map[string]common.ProtocolConfig),
 			wg:           sync.WaitGroup{},
 			serviceMutex: sync.Mutex{},
 			quitChan:     make(chan os.Signal),
@@ -119,9 +123,22 @@ func dataHandler(ctx context.Context, dev *driver.CustomizedDev) {
 			klog.Error(err)
 			continue
 		}
+
+		// If the device property type is streaming, it will directly enter the streaming data processing function,
+		// such as saving frames or saving videos, and will no longer push it to the user database and application.
+		// If there are other needs for stream data processing, users can add functions in the mapper/data/stream directory.
+		if twin.Property.PProperty.DataType == "stream" {
+			err = stream.StreamHandler(&twin, dev.CustomizedClient, &visitorConfig)
+			if err != nil {
+				klog.Errorf("processed streaming data by %s Error: %v", twin.PropertyName, err)
+			}
+			continue
+		}
+
 		// handle twin
 		twinData := &TwinData{
 			DeviceName:      dev.Instance.Name,
+			DeviceNamespace: dev.Instance.Namespace,
 			Client:          dev.CustomizedClient,
 			Name:            twin.PropertyName,
 			Type:            twin.ObservedDesired.Metadata.Type,
@@ -134,13 +151,24 @@ func dataHandler(ctx context.Context, dev *driver.CustomizedDev) {
 		go twinData.Run(ctx)
 		// handle push method
 		if twin.Property.PushMethod.MethodConfig != nil && twin.Property.PushMethod.MethodName != "" {
-			dataModel := common.NewDataModel(dev.Instance.Name, twin.Property.PropertyName, common.WithType(twin.ObservedDesired.Metadata.Type))
+			dataModel := common.NewDataModel(dev.Instance.Name, twin.Property.PropertyName, dev.Instance.Namespace, common.WithType(twin.ObservedDesired.Metadata.Type))
 			pushHandler(ctx, &twin, dev.CustomizedClient, &visitorConfig, dataModel)
 		}
 		// handle database
 		if twin.Property.PushMethod.DBMethod.DBMethodName != "" {
-			dataModel := common.NewDataModel(dev.Instance.Name, twin.Property.PropertyName, common.WithType(twin.ObservedDesired.Metadata.Type))
+			dataModel := common.NewDataModel(dev.Instance.Name, twin.Property.PropertyName, dev.Instance.Namespace, common.WithType(twin.ObservedDesired.Metadata.Type))
 			dbHandler(ctx, &twin, dev.CustomizedClient, &visitorConfig, dataModel)
+			switch twin.Property.PushMethod.DBMethod.DBMethodName {
+			// TODO add more database
+			case "influx":
+				dbInflux.DataHandler(ctx, &twin, dev.CustomizedClient, &visitorConfig, dataModel)
+			case "redis":
+				dbRedis.DataHandler(ctx, &twin, dev.CustomizedClient, &visitorConfig, dataModel)
+			case "tdengine":
+				dbTdengine.DataHandler(ctx, &twin, dev.CustomizedClient, &visitorConfig, dataModel)
+			case "mysql":
+				dbMysql.DataHandler(ctx, &twin, dev.CustomizedClient, &visitorConfig, dataModel)
+			}
 		}
 	}
 }
@@ -170,7 +198,7 @@ func pushHandler(ctx context.Context, twin *common.Twin, client *driver.Customiz
 	}
 	reportCycle := time.Duration(twin.Property.ReportCycle)
 	if reportCycle == 0 {
-		reportCycle = 1 * time.Second
+		reportCycle = common.DefaultReportCycle
 	}
 	ticker := time.NewTicker(reportCycle)
 	go func() {
@@ -202,49 +230,16 @@ func dbHandler(ctx context.Context, twin *common.Twin, client *driver.Customized
 	switch twin.Property.PushMethod.DBMethod.DBMethodName {
 	// TODO add more database
 	case "influx":
-		dbConfig, err := dbInflux.NewDataBaseClient(twin.Property.PushMethod.DBMethod.DBConfig.Influxdb2ClientConfig, twin.Property.PushMethod.DBMethod.DBConfig.Influxdb2DataConfig)
-		if err != nil {
-			klog.Errorf("new database client error: %v", err)
-			return
-		}
-		dbClient := dbConfig.InitDbClient()
-		if err != nil {
-			klog.Errorf("init database client err: %v", err)
-			return
-		}
-		reportCycle := time.Duration(twin.Property.ReportCycle)
-		if reportCycle == 0 {
-			reportCycle = 1 * time.Second
-		}
-		ticker := time.NewTicker(reportCycle)
-		go func() {
-			for {
-				select {
-				case <-ticker.C:
-					deviceData, err := client.GetDeviceData(visitorConfig)
-					if err != nil {
-						klog.Errorf("publish error: %v", err)
-						continue
-					}
-					sData, err := common.ConvertToString(deviceData)
-					if err != nil {
-						klog.Errorf("Failed to convert publish method data : %v", err)
-						continue
-					}
-					dataModel.SetValue(sData)
-					dataModel.SetTimeStamp()
+		dbInflux.DataHandler(ctx, twin, client, visitorConfig, dataModel)
 
-					err = dbConfig.AddData(dataModel, dbClient)
-					if err != nil {
-						klog.Errorf("influx database add data error: %v", err)
-						return
-					}
-				case <-ctx.Done():
-					dbConfig.CloseSession(dbClient)
-					return
-				}
-			}
-		}()
+	case "redis":
+		dbRedis.DataHandler(ctx, twin, client, visitorConfig, dataModel)
+
+	case "tdengine":
+		dbTdengine.DataHandler(ctx, twin, client, visitorConfig, dataModel)
+
+	case "mysql":
+		dbMysql.DataHandler(ctx, twin, client, visitorConfig, dataModel)
 	}
 }
 
@@ -268,30 +263,40 @@ func setVisitor(visitorConfig *driver.VisitorConfig, twin *common.Twin, dev *dri
 }
 
 // DevInit initialize the device
-func (d *DevPanel) DevInit(cfg *config.Config) error {
-	devs := make(map[string]*common.DeviceInstance)
+func (d *DevPanel) DevInit(deviceList []*dmiapi.Device, deviceModelList []*dmiapi.DeviceModel) error {
+	if len(deviceList) == 0 || len(deviceModelList) == 0 {
+		return ErrEmptyData
+	}
 
-	switch cfg.DevInit.Mode {
-	//case common.DevInitModeConfigmap:
-	//	if err := parse.Parse(cfg.DevInit.Configmap, devs, d.models, d.protocols); err != nil {
-	//		return err
-	//	}
-	case common.DevInitModeRegister:
-		if err := parse.ParseByUsingRegister(cfg, devs, d.models, d.protocols); err != nil {
+	for i := range deviceModelList {
+		model := deviceModelList[i]
+		cur := parse.GetDeviceModelFromGrpc(model)
+		d.models[model.Name] = cur
+	}
+
+	for i := range deviceList {
+		device := deviceList[i]
+		commonModel := d.models[device.Spec.DeviceModelReference]
+		protocol, err := parse.BuildProtocolFromGrpc(device)
+		if err != nil {
 			return err
 		}
+		instance, err := parse.GetDeviceFromGrpc(device, &commonModel)
+		if err != nil {
+			return err
+		}
+		instance.PProtocol = protocol
+
+		cur := new(driver.CustomizedDev)
+		cur.Instance = *instance
+		d.devices[instance.ID] = cur
 	}
 
-	for key, deviceInstance := range devs {
-		cur := new(driver.CustomizedDev)
-		cur.Instance = *deviceInstance
-		d.devices[key] = cur
-	}
 	return nil
 }
 
 // UpdateDev stop old device, then update and start new device
-func (d *DevPanel) UpdateDev(model *common.DeviceModel, device *common.DeviceInstance, protocol *common.ProtocolConfig) {
+func (d *DevPanel) UpdateDev(model *common.DeviceModel, device *common.DeviceInstance) {
 	d.serviceMutex.Lock()
 	defer d.serviceMutex.Unlock()
 
@@ -304,8 +309,7 @@ func (d *DevPanel) UpdateDev(model *common.DeviceModel, device *common.DeviceIns
 	// start new device
 	d.devices[device.ID] = new(driver.CustomizedDev)
 	d.devices[device.ID].Instance = *device
-	d.models[device.ID] = *model
-	d.protocols[device.ID] = *protocol
+	d.models[model.ID] = *model
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	d.deviceMuxs[device.ID] = cancelFunc
@@ -323,8 +327,8 @@ func (d *DevPanel) UpdateDevTwins(deviceID string, twins []common.Twin) error {
 	}
 	dev.Instance.Twins = twins
 	model := d.models[dev.Instance.Model]
-	protocol := d.protocols[dev.Instance.ProtocolName]
-	d.UpdateDev(&model, &dev.Instance, &protocol)
+	d.UpdateDev(&model, &dev.Instance)
+
 	return nil
 }
 
@@ -425,26 +429,26 @@ func (d *DevPanel) stopDev(dev *driver.CustomizedDev, id string) error {
 }
 
 // GetModel if the model exists, return device model
-func (d *DevPanel) GetModel(modelName string) (common.DeviceModel, error) {
+func (d *DevPanel) GetModel(modelID string) (common.DeviceModel, error) {
 	d.serviceMutex.Lock()
 	defer d.serviceMutex.Unlock()
-	if model, ok := d.models[modelName]; ok {
+	if model, ok := d.models[modelID]; ok {
 		return model, nil
 	}
-	return common.DeviceModel{}, fmt.Errorf("deviceModel %s not found", modelName)
+	return common.DeviceModel{}, fmt.Errorf("deviceModel %s not found", modelID)
 }
 
 // UpdateModel update device model
 func (d *DevPanel) UpdateModel(model *common.DeviceModel) {
 	d.serviceMutex.Lock()
-	d.models[model.Name] = *model
+	d.models[model.ID] = *model
 	d.serviceMutex.Unlock()
 }
 
 // RemoveModel remove device model
-func (d *DevPanel) RemoveModel(modelName string) {
+func (d *DevPanel) RemoveModel(modelID string) {
 	d.serviceMutex.Lock()
-	delete(d.models, modelName)
+	delete(d.models, modelID)
 	d.serviceMutex.Unlock()
 }
 

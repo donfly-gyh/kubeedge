@@ -27,11 +27,12 @@ const (
 	DEVSTUNKNOWN   = "UNKNOWN"
 )
 const (
-	ProtocolBlueTooth  = "bluetooth"
-	ProtocolModbus     = "modbus"
-	ProtocolOnvif      = "onvif"
-	ProtocolOpcua      = "opcua"
 	ProtocolCustomized = "customized-protocol"
+)
+
+const (
+	PushMethodHTTP = "http"
+	PushMethodMQTT = "mqtt"
 )
 
 const DefaultCollectCycle = time.Second
@@ -40,4 +41,9 @@ const DefaultReportCycle = time.Second
 const (
 	DevInitModeRegister  = "register"
 	DevInitModeConfigmap = "configmap"
+)
+
+const (
+	SaveFrame = "saveFrame"
+	SaveVideo = "saveVideo"
 )

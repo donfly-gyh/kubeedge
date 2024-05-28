@@ -16,6 +16,9 @@ const (
 	NodeUpgradeJobControllerModuleName  = "nodeupgradejobcontroller"
 	NodeUpgradeJobControllerModuleGroup = "nodeupgradejobcontroller"
 
+	TaskManagerModuleName  = "taskmanager"
+	TaskManagerModuleGroup = "taskmanager"
+
 	SyncControllerModuleName  = "synccontroller"
 	SyncControllerModuleGroup = "synccontroller"
 

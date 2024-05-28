@@ -10,14 +10,15 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/kubeedge/Template/driver"
-	"github.com/kubeedge/Template/pkg/common"
-	dmiapi "github.com/kubeedge/Template/pkg/dmi-api"
-	"github.com/kubeedge/Template/pkg/util/grpcclient"
-	"github.com/kubeedge/Template/pkg/util/parse"
+	dmiapi "github.com/kubeedge/kubeedge/pkg/apis/dmi/v1beta1"
+	"github.com/kubeedge/mapper-framework/pkg/common"
+	"github.com/kubeedge/mapper-framework/pkg/grpcclient"
+	"github.com/kubeedge/mapper-framework/pkg/util/parse"
 )
 
 type TwinData struct {
 	DeviceName      string
+	DeviceNamespace string
 	Client          *driver.CustomizedClient
 	Name            string
 	Type            string
@@ -75,7 +76,8 @@ func (td *TwinData) PushToEdgeCore() {
 	twins := parse.ConvMsgTwinToGrpc(msg.Twin)
 
 	var rdsr = &dmiapi.ReportDeviceStatusRequest{
-		DeviceName: td.DeviceName,
+		DeviceName:      td.DeviceName,
+		DeviceNamespace: td.DeviceNamespace,
 		ReportedDevice: &dmiapi.DeviceStatus{
 			Twins: twins,
 			//State: "OK",
@@ -92,7 +94,7 @@ func (td *TwinData) Run(ctx context.Context) {
 		return
 	}
 	if td.CollectCycle == 0 {
-		td.CollectCycle = 1 * time.Second
+		td.CollectCycle = common.DefaultCollectCycle
 	}
 	ticker := time.NewTicker(td.CollectCycle)
 	for {

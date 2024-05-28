@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 
 	"github.com/kubeedge/kubeedge/common/constants"
@@ -131,7 +132,7 @@ func SpliceErrors(errors []error) string {
 
 // GetHostname returns a reasonable hostname
 func GetHostname() string {
-	hostnameOverride, err := os.Hostname()
+	hostnameOverride, err := nodeutil.GetHostname("")
 	if err != nil {
 		return constants.DefaultHostnameOverride
 	}
@@ -149,4 +150,9 @@ func ConcatStrings(ss ...string) string {
 		bff.WriteString(s)
 	}
 	return bff.String()
+}
+
+// GetResourceID return resource ID
+func GetResourceID(namespace, name string) string {
+	return namespace + "/" + name
 }

@@ -28,6 +28,7 @@ import (
 	types "github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
 	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/edge"
 	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/util"
+	"github.com/kubeedge/viaduct/pkg/api"
 )
 
 var (
@@ -84,6 +85,7 @@ func NewDeprecatedEdgeJoin() *cobra.Command {
 func newJoinOptions() *types.JoinOptions {
 	opts := &types.JoinOptions{}
 	opts.CertPath = types.DefaultCertPath
+	opts.HubProtocol = api.ProtocolTypeWS
 
 	return opts
 }
@@ -92,7 +94,7 @@ func newJoinOptions() *types.JoinOptions {
 func Add2EdgeToolsList(toolList map[string]types.ToolsInstaller, flagData map[string]types.FlagData, joinOptions *types.JoinOptions) error {
 	var kubeVer string
 
-	flgData, ok := flagData[types.KubeEdgeVersion]
+	flgData, ok := flagData[types.FlagNameKubeEdgeVersion]
 	if ok {
 		kubeVer = util.CheckIfAvailable(flgData.Val.(string), flgData.DefVal.(string))
 	}
@@ -121,7 +123,6 @@ func Add2EdgeToolsList(toolList map[string]types.ToolsInstaller, flagData map[st
 		},
 		CloudCoreIP:           joinOptions.CloudCoreIPPort,
 		EdgeNodeName:          joinOptions.EdgeNodeName,
-		RuntimeType:           joinOptions.RuntimeType,
 		CertPath:              joinOptions.CertPath,
 		RemoteRuntimeEndpoint: joinOptions.RemoteRuntimeEndpoint,
 		Token:                 joinOptions.Token,
@@ -129,6 +130,7 @@ func Add2EdgeToolsList(toolList map[string]types.ToolsInstaller, flagData map[st
 		CGroupDriver:          joinOptions.CGroupDriver,
 		TarballPath:           joinOptions.TarballPath,
 		Labels:                joinOptions.Labels,
+		HubProtocol:           joinOptions.HubProtocol,
 	}
 
 	toolList["MQTT"] = &util.MQTTInstTool{}

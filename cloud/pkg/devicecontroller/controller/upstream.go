@@ -135,8 +135,9 @@ func (uc *UpstreamController) updateDeviceStatus() {
 			}
 			deviceStatus := &DeviceStatus{Status: cacheDevice.Status}
 			for twinName, twin := range msgTwin.Twin {
-				for i, cacheTwin := range deviceStatus.Status.Twins {
-					if twinName == cacheTwin.PropertyName && twin.Actual != nil && twin.Actual.Value != nil {
+				deviceTwin := findOrCreateTwinByName(twinName, cacheDevice.Spec.Properties, deviceStatus)
+				if deviceTwin != nil {
+					if twin.Actual != nil && twin.Actual.Value != nil {
 						reported := v1beta1.TwinProperty{}
 						reported.Value = *twin.Actual.Value
 						reported.Metadata = make(map[string]string)
@@ -146,8 +147,20 @@ func (uc *UpstreamController) updateDeviceStatus() {
 						if twin.Metadata != nil {
 							reported.Metadata["type"] = twin.Metadata.Type
 						}
-						deviceStatus.Status.Twins[i].Reported = reported
-						break
+						deviceTwin.Reported = reported
+					}
+
+					if twin.Expected != nil && twin.Expected.Value != nil {
+						observedDesired := v1beta1.TwinProperty{}
+						observedDesired.Value = *twin.Expected.Value
+						observedDesired.Metadata = make(map[string]string)
+						if twin.Expected.Metadata != nil {
+							observedDesired.Metadata["timestamp"] = strconv.FormatInt(twin.Expected.Metadata.Timestamp, 10)
+						}
+						if twin.Metadata != nil {
+							observedDesired.Metadata["type"] = twin.Metadata.Type
+						}
+						deviceTwin.ObservedDesired = observedDesired
 					}
 				}
 			}
@@ -161,7 +174,7 @@ func (uc *UpstreamController) updateDeviceStatus() {
 				klog.Errorf("Failed to marshal device status %v", deviceStatus)
 				continue
 			}
-			err = uc.crdClient.DevicesV1beta1().RESTClient().Patch(MergePatchType).Namespace(cacheDevice.Namespace).Resource(ResourceTypeDevices).Name(deviceID).Body(body).Do(context.Background()).Error()
+			err = uc.crdClient.DevicesV1beta1().RESTClient().Patch(MergePatchType).Namespace(cacheDevice.Namespace).Resource(ResourceTypeDevices).Name(cacheDevice.Name).Body(body).Do(context.Background()).Error()
 			if err != nil {
 				klog.Errorf("Failed to patch device status %v of device %v in namespace %v, err: %v", deviceStatus, deviceID, cacheDevice.Namespace, err)
 				continue
@@ -211,4 +224,30 @@ func NewUpstreamController(dc *DownstreamController) (*UpstreamController, error
 		dc:           dc,
 	}
 	return uc, nil
+}
+
+func findOrCreateTwinByName(twinName string, properties []v1beta1.DeviceProperty, deviceStatus *DeviceStatus) *v1beta1.Twin {
+	for i := range properties {
+		if twinName == properties[i].Name {
+			twin := findTwinByName(twinName, deviceStatus)
+			if twin != nil {
+				return twin
+			}
+			twin = &v1beta1.Twin{
+				PropertyName: twinName,
+			}
+			deviceStatus.Status.Twins = append(deviceStatus.Status.Twins, *twin)
+			return twin
+		}
+	}
+	return nil
+}
+
+func findTwinByName(twinName string, deviceStatus *DeviceStatus) *v1beta1.Twin {
+	for i := range deviceStatus.Status.Twins {
+		if twinName == deviceStatus.Status.Twins[i].PropertyName {
+			return &deviceStatus.Status.Twins[i]
+		}
+	}
+	return nil
 }

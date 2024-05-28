@@ -113,6 +113,8 @@ message DeviceModel {
     string name = 1;
     // Specification of a device model.
     DeviceModelSpec spec = 2;
+    // Namespace of the device model.
+    string namespace = 3;
 }
 
 // DeviceModelSpec is the specification of a device model.
@@ -165,6 +167,8 @@ message Device {
     DeviceSpec spec = 2;
     // Status of the device.
     DeviceStatus status = 3;
+    // Namespace of the device.
+    string namespace = 4;
 }
 
 // DeviceSpec is the specification of the device.
@@ -245,6 +249,9 @@ message PushMethodMQTT {
 message DBMethod{
     // the config of database .
     DBMethodInfluxdb2 influxdb2 = 1;
+    DBMethodRedis redis = 2;
+    DBMethodTDEngine tdengine = 3;
+    DBMethodMySQL mysql = 4;
 }
 
 message DBMethodInfluxdb2{
@@ -269,6 +276,48 @@ message Influxdb2ClientConfig{
     string bucket = 3;
 }
 
+message DBMethodRedis{
+    // data config when push data to redis
+    RedisClientConfig redisClientConfig = 1;
+}
+
+message RedisClientConfig{
+    // redis address
+    string addr = 1;
+    // number of redis db
+    int32 db = 2;
+    // number of redis poolsize
+    int32 poolsize  = 3;
+    // number of redis minidleconns
+    int32 minIdleConns =4;
+}
+
+message DBMethodTDEngine{
+    // data config when push data to tdengine
+    TDEngineClientConfig tdEngineClientConfig = 1;
+}
+
+message TDEngineClientConfig{
+    // tdengine address,like 127.0.0.1:6041
+    string addr = 1;
+    // tdengine database name
+    string dbname = 2;
+}
+
+
+message DBMethodMySQL{
+    MySQLClientConfig mysqlClientConfig = 1;
+}
+
+message MySQLClientConfig{
+    //mysql address,like localhost:3306
+    string addr = 1;
+    //database name
+    string database = 2;
+    //user name
+    string userName = 3;
+}
+
 // MapperInfo is the information of mapper.
 message MapperInfo {
     // name of the mapper.
@@ -288,6 +337,7 @@ message MapperInfo {
 message ReportDeviceStatusRequest {
     string deviceName = 1;
     DeviceStatus reportedDevice = 2;
+    string deviceNamespace = 3;
 }
 
 // DeviceStatus is the status of the device.
@@ -322,6 +372,7 @@ message RegisterDeviceRequest {
 
 message RegisterDeviceResponse {
     string deviceName = 1;
+    string deviceNamespace = 2;
 }
 
 message CreateDeviceModelRequest {
@@ -330,16 +381,19 @@ message CreateDeviceModelRequest {
 
 message CreateDeviceModelResponse {
     string deviceModelName = 1;
+    string deviceModelNamespace = 2;
 }
 
 message RemoveDeviceRequest {
     string deviceName = 1;
+    string deviceNamespace = 2;
 }
 
 message RemoveDeviceResponse {}
 
 message RemoveDeviceModelRequest {
     string modelName = 1;
+    string modelNamespace = 2;
 }
 
 message RemoveDeviceModelResponse {}
@@ -358,6 +412,7 @@ message UpdateDeviceModelResponse {}
 
 message GetDeviceRequest {
     string deviceName = 1;
+    string deviceNamespace = 2;
 }
 
 message GetDeviceResponse {

@@ -88,8 +88,8 @@ type Modules struct {
 	EdgeController *EdgeController `json:"edgeController,omitempty"`
 	// DeviceController indicates DeviceController module config
 	DeviceController *DeviceController `json:"deviceController,omitempty"`
-	// NodeUpgradeJobController indicates NodeUpgradeJobController module config
-	NodeUpgradeJobController *NodeUpgradeJobController `json:"nodeUpgradeJobController,omitempty"`
+	// TaskManager indicates TaskManager module config
+	TaskManager *TaskManager `json:"taskManager,omitempty"`
 	// SyncController indicates SyncController module config
 	SyncController *SyncController `json:"syncController,omitempty"`
 	// DynamicController indicates DynamicController module config
@@ -285,9 +285,12 @@ type EdgeControllerBuffer struct {
 	// ServiceAccount indicates the buffer of service account token
 	// default 1024
 	ServiceAccountToken int32 `json:"serviceAccountToken,omitempty"`
-	// CreatePod indicates the buffer of patch pod
+	// CreatePod indicates the buffer of create pod
 	// default 1024
 	CreatePod int32 `json:"createPod,omitempty"`
+	// CertificateSigningRequest indicates the buffer of certificatesSigningRequest
+	// default 1024
+	CertificateSigningRequest int32 `json:"certificateSigningRequest,omitempty"`
 }
 
 // EdgeControllerLoad indicates the EdgeController load
@@ -343,8 +346,12 @@ type EdgeControllerLoad struct {
 	// ServiceAccountTokenWorkers indicates the load of service account token
 	// default 4
 	ServiceAccountTokenWorkers int32 `json:"ServiceAccountTokenWorkers,omitempty"`
+	// CreatePodWorks indicates the load of create pod
 	// default 4
 	CreatePodWorks int32 `json:"CreatePodWorks,omitempty"`
+	// CertificateSigningRequestWorkers indicates the load of CertificateSigningRequest
+	// default 4
+	CertificateSigningRequestWorkers int32 `json:"certificateSigningRequestWorkers,omitempty"`
 }
 
 // DeviceController indicates the device controller
@@ -379,33 +386,62 @@ type DeviceControllerLoad struct {
 	UpdateDeviceStatusWorkers int32 `json:"updateDeviceStatusWorkers,omitempty"`
 }
 
-// NodeUpgradeJobController indicates the operations controller
-type NodeUpgradeJobController struct {
-	// Enable indicates whether NodeUpgradeJobController is enabled,
-	// if set to false (for debugging etc.), skip checking other NodeUpgradeJobController configs.
+// TaskManager indicates the operations controller
+type TaskManager struct {
+	// Enable indicates whether TaskManager is enabled,
+	// if set to false (for debugging etc.), skip checking other TaskManager configs.
 	// default false
 	Enable bool `json:"enable"`
 	// Buffer indicates Operation Controller buffer
-	Buffer *NodeUpgradeJobControllerBuffer `json:"buffer,omitempty"`
+	Buffer *TaskManagerBuffer `json:"buffer,omitempty"`
 	// Load indicates Operation Controller Load
-	Load *NodeUpgradeJobControllerLoad `json:"load,omitempty"`
+	Load *TaskManagerLoad `json:"load,omitempty"`
 }
 
-// NodeUpgradeJobControllerBuffer indicates NodeUpgradeJobController buffer
-type NodeUpgradeJobControllerBuffer struct {
-	// UpdateNodeUpgradeJobStatus indicates the buffer of update NodeUpgradeJob status
+// TaskManagerBuffer indicates TaskManager buffer
+type TaskManagerBuffer struct {
+	// TaskStatus indicates the buffer of update NodeUpgradeJob status
 	// default 1024
-	UpdateNodeUpgradeJobStatus int32 `json:"updateNodeUpgradeJobStatus,omitempty"`
-	// NodeUpgradeJobEvent indicates the buffer of NodeUpgradeJob event
+	TaskStatus int32 `json:"taskStatus,omitempty"`
+	// TaskEvent indicates the buffer of NodeUpgradeJob event
 	// default 1
-	NodeUpgradeJobEvent int32 `json:"nodeUpgradeJobEvent,omitempty"`
+	TaskEvent int32 `json:"taskEvent,omitempty"`
 }
 
-// NodeUpgradeJobControllerLoad indicates the NodeUpgradeJobController load
-type NodeUpgradeJobControllerLoad struct {
-	// NodeUpgradeJobWorkers indicates the load of update NodeUpgradeJob workers
+// TaskManagerLoad indicates the TaskManager load
+type TaskManagerLoad struct {
+	// TaskWorkers indicates the load of update NodeUpgradeJob workers
 	// default 1
-	NodeUpgradeJobWorkers int32 `json:"nodeUpgradeJobWorkers,omitempty"`
+	TaskWorkers int32 `json:"taskWorkers,omitempty"`
+}
+
+// ImagePrePullController indicates the operations controller
+type ImagePrePullController struct {
+	// Enable indicates whether ImagePrePullController is enabled,
+	// if set to false (for debugging etc.), skip checking other ImagePrePullController configs.
+	// default false
+	Enable bool `json:"enable"`
+	// Buffer indicates Operation Controller buffer
+	Buffer *ImagePrePullControllerBuffer `json:"buffer,omitempty"`
+	// Load indicates Operation Controller Load
+	Load *ImagePrePullControllerLoad `json:"load,omitempty"`
+}
+
+// ImagePrePullControllerBuffer indicates ImagePrePullController buffer
+type ImagePrePullControllerBuffer struct {
+	// ImagePrePullJobStatus indicates the buffer of update ImagePrePullJob status
+	// default 1024
+	ImagePrePullJobStatus int32 `json:"imagePrePullJobStatus,omitempty"`
+	// ImagePrePullJobEvent indicates the buffer of ImagePrePullJob event
+	// default 1
+	ImagePrePullJobEvent int32 `json:"imagePrePullJobEvent,omitempty"`
+}
+
+// ImagePrePullControllerLoad indicates the ImagePrePullController load
+type ImagePrePullControllerLoad struct {
+	// ImagePrePullJobWorkers indicates the load of update ImagePrePullJob workers
+	// default 1
+	ImagePrePullJobWorkers int32 `json:"imagePrePullJobWorkers,omitempty"`
 }
 
 // SyncController indicates the sync controller

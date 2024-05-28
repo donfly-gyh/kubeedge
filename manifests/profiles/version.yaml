@@ -1,14 +1,14 @@
 # Default values for kubeedge.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-appVersion: "1.13.0"
+appVersion: "1.15.1"
 
 cloudCore:
   replicaCount: 1
   hostNetWork: true
   image:
     repository: "kubeedge/cloudcore"
-    tag: "v1.13.0"
+    tag: "v1.15.1"
     pullPolicy: "IfNotPresent"
     pullSecrets: []
   securityContext:
@@ -33,6 +33,9 @@ cloudCore:
     requests:
       cpu: 100m
       memory: 512Mi
+  strategy: {}
+  featureGate:
+    requireAuthorization: false
   modules:
     cloudHub:
       advertiseAddress:   # Caution!: Leave this entry to empty will cause CloudCore to exit abnormally once KubeEdge is enabled.
@@ -51,7 +54,7 @@ cloudCore:
       enable: false
     router:
       enable: false
-    nodeUpgradeJobController:
+    taskManager:
       enable: false
   service:
     enable: false
@@ -68,7 +71,7 @@ iptablesManager:
   hostNetWork: true
   image:
     repository: "kubeedge/iptables-manager"
-    tag: "v1.12.0"
+    tag: "v1.15.1"
     pullPolicy: "IfNotPresent"
     pullSecrets: []
   securityContext:
@@ -101,7 +104,7 @@ controllerManager:
   enable: false
   image:
     repository: "kubeedge/controller-manager"
-    tag: "v1.12.0"
+    tag: "v1.15.1"
     pullPolicy: "IfNotPresent"
     pullSecrets: []
   labels:
@@ -130,3 +133,30 @@ controllerManager:
     requests:
       cpu: 100m
       memory: 25Mi
+
+mosquitto:
+  enable: true
+  image:
+    repository: eclipse-mosquitto
+    tag: "1.6.15"
+    pullPolicy: "IfNotPresent"
+    pullSecrets: []
+  labels:
+    k8s-app: eclipse-mosquitto
+    kubeedge: eclipse-mosquitto
+  annotations: {}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/edge
+                operator: Exists
+  tolerations: []
+  resources:
+    limits:
+      cpu: 200m
+      memory: 100Mi
+    requests:
+      cpu: 100m
+      memory: 50Mi

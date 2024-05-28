@@ -24,7 +24,10 @@ source "${KUBEEDGE_ROOT}/hack/lib/install.sh"
 
 function cleanup() {
   sudo pkill edgecore || true
-  helm uninstall cloudcore -n kubeedge && kubectl delete ns kubeedge  || true
+  helm uninstall cloudcore -n kubeedge || true
+  # The namespace cleanup timeout may occur if pods is not clearned
+  kubectl get pods -n kubeedge | awk '{print $1}' | grep -v NAME | xargs kubectl delete pods -n kubeedge --force --grace-period=0 || true
+  kubectl delete ns kubeedge --force --grace-period=0  || true
   kind delete cluster --name test
   sudo rm -rf /var/log/kubeedge /etc/kubeedge /etc/systemd/system/edgecore.service $E2E_DIR/e2e_keadm/e2e_keadm.test $E2E_DIR/config.json
 }
@@ -72,7 +75,7 @@ function start_kubeedge() {
   export MASTER_IP=`kubectl get node test-control-plane -o jsonpath={.status.addresses[0].address}`
   export KUBECONFIG=$HOME/.kube/config
   docker run --rm kubeedge/installation-package:$IMAGE_TAG cat /usr/local/bin/keadm > /usr/local/bin/keadm && chmod +x /usr/local/bin/keadm
-  /usr/local/bin/keadm init --advertise-address=$MASTER_IP --profile version=$KUBEEDGE_VERSION --set cloudCore.service.enable=false --kube-config=$KUBECONFIG --force
+  /usr/local/bin/keadm init --advertise-address=$MASTER_IP --kubeedge-version $KUBEEDGE_VERSION --set cloudCore.service.enable=false --kube-config=$KUBECONFIG --force
   
   # ensure tokensecret is generated
   while true; do

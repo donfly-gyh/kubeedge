@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
@@ -95,10 +96,23 @@ func GetAuthConfig() *rest.Config {
 	return authKubeConfig
 }
 
+func GetK8sCA() []byte {
+	ca, err := os.ReadFile(KubeConfig.CAFile)
+	if err != nil {
+		klog.Errorf("read k8s CA failed, %v", err)
+		return nil
+	}
+	return ca
+}
+
 type RestMapperFunc func() (meta.RESTMapper, error)
 
 var DefaultGetRestMapper RestMapperFunc = GetRestMapper
 
 func GetRestMapper() (meta.RESTMapper, error) {
-	return apiutil.NewDynamicRESTMapper(KubeConfig)
+	client, err := rest.HTTPClientFor(KubeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("new http client for kubeConfig faled, err: %v", err)
+	}
+	return apiutil.NewDynamicRESTMapper(KubeConfig, client)
 }

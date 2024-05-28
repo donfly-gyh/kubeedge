@@ -1,8 +1,8 @@
 package global
 
 import (
-	"github.com/kubeedge/Template/pkg/common"
-	"github.com/kubeedge/Template/pkg/config"
+	dmiapi "github.com/kubeedge/kubeedge/pkg/apis/dmi/v1beta1"
+	"github.com/kubeedge/mapper-framework/pkg/common"
 )
 
 // DevPanel defined operations on devices, manage the lifecycle of devices
@@ -10,9 +10,9 @@ type DevPanel interface {
 	// DevStart start device to collect/push/save data to edgecore/app/database
 	DevStart()
 	// DevInit get device info by dmi interface
-	DevInit(cfg *config.Config) error
+	DevInit(deviceList []*dmiapi.Device, deviceModelList []*dmiapi.DeviceModel) error
 	// UpdateDev update device's config and restart the device
-	UpdateDev(model *common.DeviceModel, device *common.DeviceInstance, protocol *common.ProtocolConfig)
+	UpdateDev(model *common.DeviceModel, device *common.DeviceInstance)
 	// UpdateDevTwins update device twin's config and restart the device
 	UpdateDevTwins(deviceID string, twins []common.Twin) error
 	// DealDeviceTwinGet get device's twin data
@@ -22,11 +22,11 @@ type DevPanel interface {
 	// RemoveDevice stop device and remove device
 	RemoveDevice(deviceID string) error
 	// GetModel get model's info
-	GetModel(modelName string) (common.DeviceModel, error)
+	GetModel(modelID string) (common.DeviceModel, error)
 	// UpdateModel update model in map only
 	UpdateModel(model *common.DeviceModel)
 	// RemoveModel remove model in map only
-	RemoveModel(modelName string)
+	RemoveModel(modelID string)
 	// GetTwinResult get device's property value and datatype
 	GetTwinResult(deviceID string, twinName string) (string, string, error)
 }

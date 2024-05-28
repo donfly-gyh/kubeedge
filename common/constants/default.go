@@ -11,9 +11,6 @@ const (
 	// SyncController
 	DefaultContextSendModuleName = "cloudhub"
 
-	// NodeName is for the clearer log of cloudcore.
-	NodeName = "NodeName"
-
 	ProjectName = "KubeEdge"
 
 	SystemName      = "kubeedge"
@@ -31,6 +28,7 @@ const (
 	DefaultCAURL                = "/ca.crt"
 	DefaultCertURL              = "/edge.crt"
 	DefaultNodeUpgradeURL       = "/nodeupgrade"
+	DefaultTaskStateReportURL   = "/task/{taskType}/name/{taskID}/node/{nodeID}/status"
 	DefaultServiceAccountIssuer = "https://kubernetes.default.svc.cluster.local"
 
 	// Edged
@@ -38,7 +36,9 @@ const (
 	DefaultDockershimRootDir   = "/var/lib/dockershim"
 	DefaultRuntimeType         = "remote"
 	DefaultEdgedMemoryCapacity = 7852396000
-	DefaultMosquittoImage      = "eclipse-mosquitto:1.6.15"
+	// DefaultMosquittoImage ...
+	// Deprecated: the mqtt broker is alreay managed by the DaemonSet in the cloud
+	DefaultMosquittoImage = "eclipse-mosquitto:1.6.15"
 	// update PodSandboxImage version when bumping k8s vendor version, consistent with vendor/k8s.io/kubernetes/cmd/kubelet/app/options/container_runtime.go defaultPodSandboxImageVersion
 	// When this value are updated, also update comments in pkg/apis/componentconfig/edgecore/v1alpha1/types.go
 	DefaultPodSandboxImage             = "kubeedge/pause:3.6"
@@ -55,11 +55,12 @@ const (
 	DefaultTunnelPort                  = 10004
 	DefaultClusterDomain               = "cluster.local"
 
-	CurrentSupportK8sVersion = "v1.26.7"
+	CurrentSupportK8sVersion = "v1.28.6"
 
 	// MetaManager
 	DefaultRemoteQueryTimeout = 60
 	DefaultMetaServerAddr     = "127.0.0.1:10550"
+	DefaultDummyServerAddr    = "169.254.30.10:10550"
 
 	// Config
 	DefaultKubeContentType         = "application/vnd.kubernetes.protobuf"
@@ -84,7 +85,8 @@ const (
 	DefaultUpdateRuleStatusWorkers           = 4
 	DefaultQueryLeaseWorkers                 = 100
 	DefaultServiceAccountTokenWorkers        = 100
-	CreatePodWorks                           = 4
+	DefaultCreatePodWorkers                  = 4
+	DefaultCertificateSigningRequestWorkers  = 4
 
 	DefaultUpdatePodStatusBuffer            = 1024
 	DefaultUpdateNodeStatusBuffer           = 1024
@@ -100,6 +102,7 @@ const (
 	DefaultQueryLeaseBuffer                 = 1024
 	DefaultServiceAccountTokenBuffer        = 1024
 	DefaultCreatePodBuffer                  = 1024
+	DefaultCertificateSigningRequestBuffer  = 1024
 
 	DefaultPodEventBuffer           = 1
 	DefaultConfigMapEventBuffer     = 1
@@ -113,10 +116,15 @@ const (
 	DefaultDeviceModelEventBuffer    = 1
 	DefaultUpdateDeviceStatusWorkers = 1
 
-	// NodeUpgradeJobController
+	// TaskManager
 	DefaultNodeUpgradeJobStatusBuffer = 1024
 	DefaultNodeUpgradeJobEventBuffer  = 1
 	DefaultNodeUpgradeJobWorkers      = 1
+
+	// ImagePrePullController
+	DefaultImagePrePullJobStatusBuffer = 1024
+	DefaultImagePrePullJobEventBuffer  = 1
+	DefaultImagePrePullJobWorkers      = 1
 
 	// Resource sep
 	ResourceSep = "/"
@@ -150,9 +158,17 @@ const (
 	EdgeNodeRoleKey   = "node-role.kubernetes.io/edge"
 	EdgeNodeRoleValue = ""
 
+	// DefaultMosquittoContainerName ...
+	// Deprecated: the mqtt broker is alreay managed by the DaemonSet in the cloud
 	DefaultMosquittoContainerName = "mqtt-kubeedge"
-	DeployMqttContainerEnv        = "DEPLOY_MQTT_CONTAINER"
+	// DeployMqttContainerEnv ...
+	// Deprecated: the mqtt broker is alreay managed by the DaemonSet in the cloud
+	DeployMqttContainerEnv = "DEPLOY_MQTT_CONTAINER"
 
-	// DefaultManifestsDir edge node default static pod path
-	DefaultManifestsDir = "/etc/kubeedge/manifests"
+	// EdgeHub
+	DefaultWebSocketPort = 10000
+	DefaultQuicPort      = 10001
+
+	// DeviceTwin
+	DefaultDMISockPath = "/etc/kubeedge/dmi.sock"
 )

@@ -98,14 +98,14 @@ func NewDefaultCloudCoreConfig() *CloudCoreConfig {
 					UpdateDeviceStatusWorkers: constants.DefaultUpdateDeviceStatusWorkers,
 				},
 			},
-			NodeUpgradeJobController: &NodeUpgradeJobController{
+			TaskManager: &TaskManager{
 				Enable: false,
-				Buffer: &NodeUpgradeJobControllerBuffer{
-					UpdateNodeUpgradeJobStatus: constants.DefaultNodeUpgradeJobStatusBuffer,
-					NodeUpgradeJobEvent:        constants.DefaultNodeUpgradeJobEventBuffer,
+				Buffer: &TaskManagerBuffer{
+					TaskStatus: constants.DefaultNodeUpgradeJobStatusBuffer,
+					TaskEvent:  constants.DefaultNodeUpgradeJobEventBuffer,
 				},
-				Load: &NodeUpgradeJobControllerLoad{
-					NodeUpgradeJobWorkers: constants.DefaultNodeUpgradeJobWorkers,
+				Load: &TaskManagerLoad{
+					TaskWorkers: constants.DefaultNodeUpgradeJobWorkers,
 				},
 			},
 			SyncController: &SyncController{
@@ -163,7 +163,8 @@ func getDefaultEdgeControllerLoad(nodeLimit int32) *EdgeControllerLoad {
 		QueryLeaseWorkers:                 constants.DefaultQueryLeaseWorkers,
 		UpdateRuleStatusWorkers:           constants.DefaultUpdateRuleStatusWorkers,
 		ServiceAccountTokenWorkers:        constants.DefaultServiceAccountTokenWorkers,
-		CreatePodWorks:                    constants.CreatePodWorks,
+		CreatePodWorks:                    constants.DefaultCreatePodWorkers,
+		CertificateSigningRequestWorkers:  constants.DefaultCertificateSigningRequestWorkers,
 	}
 }
 
@@ -192,6 +193,7 @@ func getDefaultEdgeControllerBuffer(nodeLimit int32) *EdgeControllerBuffer {
 		QueryLease:                 constants.DefaultQueryLeaseBuffer,
 		ServiceAccountToken:        constants.DefaultServiceAccountTokenBuffer,
 		CreatePod:                  constants.DefaultCreatePodBuffer,
+		CertificateSigningRequest:  constants.DefaultCertificateSigningRequestBuffer,
 	}
 }
 

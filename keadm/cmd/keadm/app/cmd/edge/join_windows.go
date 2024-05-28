@@ -41,42 +41,51 @@ import (
 	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha2"
 	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha2/validation"
 	pkgutil "github.com/kubeedge/kubeedge/pkg/util"
+	"github.com/kubeedge/viaduct/pkg/api"
 )
 
 func AddJoinOtherFlags(cmd *cobra.Command, joinOptions *common.JoinOptions) {
-	cmd.Flags().StringVar(&joinOptions.KubeEdgeVersion, common.KubeEdgeVersion, joinOptions.KubeEdgeVersion,
+	cmd.Flags().StringVar(&joinOptions.KubeEdgeVersion, common.FlagNameKubeEdgeVersion, joinOptions.KubeEdgeVersion,
 		"Use this key to download and use the required KubeEdge version")
-	cmd.Flags().Lookup(common.KubeEdgeVersion).NoOptDefVal = joinOptions.KubeEdgeVersion
+	cmd.Flags().Lookup(common.FlagNameKubeEdgeVersion).NoOptDefVal = joinOptions.KubeEdgeVersion
 
-	cmd.Flags().StringVar(&joinOptions.CertPath, common.CertPath, joinOptions.CertPath,
+	cmd.Flags().StringVar(&joinOptions.CertPath, common.FlagNameCertPath, joinOptions.CertPath,
 		fmt.Sprintf("The certPath used by edgecore, the default value is %s", common.DefaultCertPath))
 
-	cmd.Flags().StringVarP(&joinOptions.CloudCoreIPPort, common.CloudCoreIPPort, "e", joinOptions.CloudCoreIPPort,
+	cmd.Flags().StringVarP(&joinOptions.CloudCoreIPPort, common.FlagNameCloudCoreIPPort, "e", joinOptions.CloudCoreIPPort,
 		"IP:Port address of KubeEdge CloudCore")
 
-	if err := cmd.MarkFlagRequired(common.CloudCoreIPPort); err != nil {
+	if err := cmd.MarkFlagRequired(common.FlagNameCloudCoreIPPort); err != nil {
 		fmt.Printf("mark flag required failed with error: %v\n", err)
 	}
 
-	cmd.Flags().StringVarP(&joinOptions.EdgeNodeName, common.EdgeNodeName, "i", joinOptions.EdgeNodeName,
+	cmd.Flags().StringVarP(&joinOptions.EdgeNodeName, common.FlagNameEdgeNodeName, "i", joinOptions.EdgeNodeName,
 		"KubeEdge Node unique identification string, if flag not used then the command will generate a unique id on its own")
 
-	cmd.Flags().StringVarP(&joinOptions.RemoteRuntimeEndpoint, common.RemoteRuntimeEndpoint, "p", joinOptions.RemoteRuntimeEndpoint,
+	cmd.Flags().StringVarP(&joinOptions.RemoteRuntimeEndpoint, common.FlagNameRemoteRuntimeEndpoint, "p", joinOptions.RemoteRuntimeEndpoint,
 		"KubeEdge Edge Node RemoteRuntimeEndpoint string.")
 
-	cmd.Flags().StringVarP(&joinOptions.Token, common.Token, "t", joinOptions.Token,
+	cmd.Flags().StringVarP(&joinOptions.Token, common.FlagNameToken, "t", joinOptions.Token,
 		"Used for edge to apply for the certificate")
 
-	cmd.Flags().StringVarP(&joinOptions.CertPort, common.CertPort, "s", joinOptions.CertPort,
+	cmd.Flags().StringVarP(&joinOptions.CertPort, common.FlagNameCertPort, "s", joinOptions.CertPort,
 		"The port where to apply for the edge certificate")
 
-	cmd.Flags().StringSliceVarP(&joinOptions.Labels, common.Labels, "l", joinOptions.Labels,
+	cmd.Flags().StringSliceVarP(&joinOptions.Labels, common.FlagNameLabels, "l", joinOptions.Labels,
 		`Use this key to set the customized labels for node, you can input customized labels like key1=value1,key2=value2`)
+
+	cmd.Flags().StringVar(&joinOptions.ImageRepository, common.FlagNameImageRepository, joinOptions.ImageRepository,
+		`Use this key to decide which image repository to pull images from`,
+	)
+
+	cmd.Flags().StringVar(&joinOptions.HubProtocol, common.HubProtocol, joinOptions.HubProtocol,
+		`Use this key to decide which communication protocol the edge node adopts.`)
+
+	cmd.Flags().StringVar(&joinOptions.Sets, common.FlagNameSet, joinOptions.Sets,
+		`Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)`)
 }
 
 func createEdgeConfigFiles(opt *common.JoinOptions) error {
-	// Determines whether the kubeEdgeVersion is earlier than v1.12.0
-	// If so, we need to create edgeconfig with v1alpha1 version
 	v, err := semver.ParseTolerant(opt.KubeEdgeVersion)
 	if err != nil {
 		return fmt.Errorf("parse kubeedge version failed, %v", err)
@@ -102,7 +111,6 @@ func createEdgeConfigFiles(opt *common.JoinOptions) error {
 		edgeCoreConfig = v1alpha2.NewDefaultEdgeCoreConfig()
 	}
 
-	edgeCoreConfig.Modules.EdgeHub.WebSocket.Server = opt.CloudCoreIPPort
 	// TODO: remove this after release 1.14
 	// this is for keeping backward compatibility
 	// don't save token in configuration edgecore.yaml
@@ -112,13 +120,10 @@ func createEdgeConfigFiles(opt *common.JoinOptions) error {
 	if opt.EdgeNodeName != "" {
 		edgeCoreConfig.Modules.Edged.HostnameOverride = opt.EdgeNodeName
 	}
-	if opt.RuntimeType != "" {
-		edgeCoreConfig.Modules.Edged.ContainerRuntime = opt.RuntimeType
-	}
 
 	if opt.RemoteRuntimeEndpoint != "" {
-		edgeCoreConfig.Modules.Edged.RemoteRuntimeEndpoint = opt.RemoteRuntimeEndpoint
-		edgeCoreConfig.Modules.Edged.RemoteImageEndpoint = opt.RemoteRuntimeEndpoint
+		edgeCoreConfig.Modules.Edged.TailoredKubeletConfig.ContainerRuntimeEndpoint = opt.RemoteRuntimeEndpoint
+		edgeCoreConfig.Modules.Edged.TailoredKubeletConfig.ImageServiceEndpoint = opt.RemoteRuntimeEndpoint
 	}
 
 	host, _, err := net.SplitHostPort(opt.CloudCoreIPPort)
@@ -130,10 +135,31 @@ func createEdgeConfigFiles(opt *common.JoinOptions) error {
 	} else {
 		edgeCoreConfig.Modules.EdgeHub.HTTPServer = "https://" + net.JoinHostPort(host, "10002")
 	}
+
+	switch opt.HubProtocol {
+	case api.ProtocolTypeQuic:
+		edgeCoreConfig.Modules.EdgeHub.Quic.Enable = true
+		edgeCoreConfig.Modules.EdgeHub.WebSocket.Enable = false
+		edgeCoreConfig.Modules.EdgeHub.Quic.Server = opt.CloudCoreIPPort
+		edgeCoreConfig.Modules.EdgeHub.WebSocket.Server = net.JoinHostPort(host, strconv.Itoa(constants.DefaultWebSocketPort))
+	case api.ProtocolTypeWS:
+		edgeCoreConfig.Modules.EdgeHub.Quic.Enable = false
+		edgeCoreConfig.Modules.EdgeHub.WebSocket.Enable = true
+		edgeCoreConfig.Modules.EdgeHub.Quic.Server = net.JoinHostPort(host, strconv.Itoa(constants.DefaultQuicPort))
+		edgeCoreConfig.Modules.EdgeHub.WebSocket.Server = opt.CloudCoreIPPort
+	default:
+		return fmt.Errorf("unsupported hub of protocol: %s", opt.HubProtocol)
+	}
 	edgeCoreConfig.Modules.EdgeStream.TunnelServer = net.JoinHostPort(host, strconv.Itoa(constants.DefaultTunnelPort))
 
 	if len(opt.Labels) > 0 {
 		edgeCoreConfig.Modules.Edged.NodeLabels = setEdgedNodeLabels(opt)
+	}
+
+	if len(opt.Sets) > 0 {
+		if err := util.ParseSet(edgeCoreConfig, opt.Sets); err != nil {
+			return err
+		}
 	}
 
 	if errs := validation.ValidateEdgeCoreConfiguration(edgeCoreConfig); len(errs) > 0 {

@@ -1,9 +1,7 @@
 # KubeEdge
-[![Build Status](https://travis-ci.org/kubeedge/kubeedge.svg?branch=master)](https://travis-ci.org/kubeedge/kubeedge)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeedge/kubeedge)](https://goreportcard.com/report/github.com/kubeedge/kubeedge)
 [![LICENSE](https://img.shields.io/github/license/kubeedge/kubeedge.svg?style=flat-square)](/LICENSE)
 [![Releases](https://img.shields.io/github/release/kubeedge/kubeedge/all.svg?style=flat-square)](https://github.com/kubeedge/kubeedge/releases)
-[![Documentation Status](https://readthedocs.org/projects/kubeedge/badge/?version=latest)](https://kubeedge.readthedocs.io/en/latest/?badge=latest)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3018/badge)](https://bestpractices.coreinfrastructure.org/projects/3018)
 
 <img src="./docs/images/kubeedge-logo-only.png">
@@ -57,13 +55,14 @@ KubeEdge consists of cloud part and edge part.
 
 ## Kubernetes compatibility
 
-|               | Kubernetes 1.20 | Kubernetes 1.21 | Kubernetes 1.22 | Kubernetes 1.23 | Kubernetes 1.24 | Kubernetes 1.25 | Kubernetes 1.26 |
-| ------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
-| KubeEdge 1.12 | ✓               | ✓               | ✓               | -               | -               | -               | -               |
-| KubeEdge 1.13 | +               | ✓               | ✓               | ✓               | -               | -               | -               |
-| KubeEdge 1.14 | +               | +               | ✓               | ✓               | ✓               | -               | -               |
-| KubeEdge 1.15 | +               | +               | +               | +               | ✓               | ✓               | ✓               |
-| KubeEdge HEAD (master) | +               | +               | +               | +               | ✓               | ✓               | ✓               |
+|                        | Kubernetes 1.20 | Kubernetes 1.21 | Kubernetes 1.22 | Kubernetes 1.23 | Kubernetes 1.24 | Kubernetes 1.25 | Kubernetes 1.26 | Kubernetes 1.27 | Kubernetes 1.28 |
+|------------------------| --------------- | --------------- | --------------- | --------------- |-----------------| --------------- | --------------- | --------------- | --------------- |
+| KubeEdge 1.12          | ✓               | ✓               | ✓               | -               | -               | -               | -               | -               | -               |
+| KubeEdge 1.13          | +               | ✓               | ✓               | ✓               | -               | -               | -               | -               | -               |
+| KubeEdge 1.14          | +               | +               | ✓               | ✓               | ✓               | -               | -               | -               | -               |
+| KubeEdge 1.15          | +               | +               | +               | +               | ✓               | ✓               | ✓               | -               | -               |
+| KubeEdge 1.16          | +               | +               | +               | +               | +               | ✓               | ✓               | ✓               | -               |
+| KubeEdge HEAD (master) | +               | +               | +               | +               | +               | +               | ✓               | ✓               | ✓               |
 
 Key:
 * `✓` KubeEdge and the Kubernetes version are exactly compatible.
@@ -80,7 +79,7 @@ To learn deeply about KubeEdge, try some examples on [examples](https://github.c
 
 ## Roadmap
 
-* [2023 Roadmap](https://github.com/kubeedge/community/blob/master/roadmap.md)
+* [2024 Roadmap](https://github.com/kubeedge/community/blob/master/roadmap.md)
 
 ## Meeting
 
@@ -103,7 +102,7 @@ If you need support, start with the [troubleshooting guide](https://kubeedge.io/
 If you have questions, feel free to reach out to us in the following ways:
 
 - [mailing list](https://groups.google.com/forum/#!forum/kubeedge)
-- [slack](https://join.slack.com/t/kubeedge/shared_invite/enQtNjc0MTg2NTg2MTk0LWJmOTBmOGRkZWNhMTVkNGU1ZjkwNDY4MTY4YTAwNDAyMjRkMjdlMjIzYmMxODY1NGZjYzc4MWM5YmIxZjU1ZDI)
+- [slack](https://kubeedge.io/docs/community/slack)
 - [twitter](https://twitter.com/kubeedge)
 
 ## Contributing

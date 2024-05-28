@@ -153,7 +153,11 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 		fmt.Printf("[etcd] Would add etcd member: %s\n", etcdPeerAddress)
 	} else {
 		klog.V(1).Infof("[etcd] Adding etcd member: %s", etcdPeerAddress)
-		cluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
+		if features.Enabled(cfg.FeatureGates, features.EtcdLearnerMode) {
+			cluster, err = etcdClient.AddMemberAsLearner(nodeName, etcdPeerAddress)
+		} else {
+			cluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
+		}
 		if err != nil {
 			return err
 		}
@@ -170,6 +174,17 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	if isDryRun {
 		fmt.Println("[etcd] Would wait for the new etcd member to join the cluster")
 		return nil
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.EtcdLearnerMode) {
+		learnerID, err := etcdClient.GetMemberID(etcdPeerAddress)
+		if err != nil {
+			return err
+		}
+		err = etcdClient.MemberPromote(learnerID)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
@@ -209,6 +224,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 			},
 			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health?exclude=NOSPACE&serializable=true", probePort, probeScheme),
 			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health?serializable=false", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
+			Env:           kubeadmutil.MergeKubeadmEnvVars(cfg.Etcd.Local.ExtraEnvs),
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)

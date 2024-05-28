@@ -92,6 +92,7 @@ type ProtocolConfig struct {
 // DeviceProperty describes the specifics all the properties of the device.
 type DeviceProperty struct {
 	// Required: The device property name to be accessed. It must be unique.
+	// Note: If you need to use the built-in stream data processing function, you need to define Name as saveFrame or saveVideo
 	Name string `json:"name,omitempty"`
 	// The desired property value.
 	Desired TwinProperty `json:"desired,omitempty"`
@@ -156,6 +157,12 @@ type DBMethodConfig struct {
 	// method configuration for database
 	// +optional
 	Influxdb2 *DBMethodInfluxdb2 `json:"influxdb2,omitempty"`
+	// +optional
+	Redis *DBMethodRedis `json:"redis,omitempty"`
+	// +optional
+	TDEngine *DBMethodTDEngine `json:"TDEngine,omitempty"`
+	// +optional
+	Mysql *DBMethodMySQL `json:"mysql,omitempty"`
 }
 
 type DBMethodInfluxdb2 struct {
@@ -189,6 +196,54 @@ type Influxdb2DataConfig struct {
 	// FieldKey of the user data
 	// +optional
 	FieldKey string `json:"fieldKey,omitempty"`
+}
+
+type DBMethodRedis struct {
+	// RedisClientConfig of redis database
+	// +optional
+	RedisClientConfig *RedisClientConfig `json:"redisClientConfig,omitempty"`
+}
+
+type RedisClientConfig struct {
+	// Addr of Redis database
+	// +optional
+	Addr string `json:"addr,omitempty"`
+	// Db of Redis database
+	// +optional
+	DB int `json:"db,omitempty"`
+	// Poolsize of Redis database
+	// +optional
+	Poolsize int `json:"poolsize,omitempty"`
+	// MinIdleConns of Redis database
+	// +optional
+	MinIdleConns int `json:"minIdleConns,omitempty"`
+}
+
+type DBMethodTDEngine struct {
+	// tdengineClientConfig of tdengine database
+	// +optional
+	TDEngineClientConfig *TDEngineClientConfig `json:"TDEngineClientConfig,omitempty"`
+}
+type TDEngineClientConfig struct {
+	// addr of tdEngine database
+	// +optional
+	Addr string `json:"addr,omitempty"`
+	// dbname of tdEngine database
+	// +optional
+	DBName string `json:"dbName,omitempty"`
+}
+
+type DBMethodMySQL struct {
+	MySQLClientConfig *MySQLClientConfig `json:"mysqlClientConfig,omitempty"`
+}
+
+type MySQLClientConfig struct {
+	// mysql address,like localhost:3306
+	Addr string `protobuf:"bytes,1,opt,name=addr,proto3" json:"addr,omitempty"`
+	// database name
+	Database string `protobuf:"bytes,2,opt,name=database,proto3" json:"database,omitempty"`
+	// user name
+	UserName string `protobuf:"bytes,3,opt,name=userName,proto3" json:"userName,omitempty"`
 }
 
 type VisitorConfig struct {

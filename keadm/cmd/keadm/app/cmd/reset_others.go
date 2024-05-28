@@ -27,11 +27,11 @@ import (
 
 	"github.com/spf13/cobra"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilsexec "k8s.io/utils/exec"
 
+	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/cloud"
 	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/common"
+	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/edge"
 	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/helm"
 	"github.com/kubeedge/kubeedge/keadm/cmd/keadm/app/cmd/util"
 )
@@ -47,20 +47,13 @@ For cloud node:
 keadm reset
 
 For edge node:
-keadm reset
+keadm reset edge
 `
 )
 
-func newResetOptions() *common.ResetOptions {
-	opts := &common.ResetOptions{}
-	opts.Kubeconfig = common.DefaultKubeConfig
-	opts.RuntimeType = kubetypes.RemoteContainerRuntime
-	return opts
-}
-
 func NewKubeEdgeReset() *cobra.Command {
 	isEdgeNode := false
-	reset := newResetOptions()
+	reset := util.NewResetOptions()
 
 	var cmd = &cobra.Command{
 		Use:     "reset",
@@ -94,16 +87,21 @@ func NewKubeEdgeReset() *cobra.Command {
 				}
 			}
 
-			// first cleanup edge node static pod directory to stop static and mirror pod
 			if isEdgeNode {
+				staticPodPath := ""
 				config, err := util.ParseEdgecoreConfig(common.EdgecoreConfigPath)
 				if err != nil {
-					return err
+					fmt.Printf("failed to get edgecore's config with err:%v\n", err)
+				} else {
+					if reset.Endpoint == "" {
+						reset.Endpoint = config.Modules.Edged.TailoredKubeletConfig.ContainerRuntimeEndpoint
+					}
+					staticPodPath = config.Modules.Edged.TailoredKubeletConfig.StaticPodPath
 				}
-				dir := config.Modules.Edged.TailoredKubeletConfig.StaticPodPath
-				if dir != "" {
-					if err := phases.CleanDir(dir); err != nil {
-						fmt.Printf("Failed to delete static pod directory %s: %v\n", dir, err)
+				// first cleanup edge node static pod directory to stop static and mirror pod
+				if staticPodPath != "" {
+					if err := phases.CleanDir(staticPodPath); err != nil {
+						fmt.Printf("Failed to delete static pod directory %s: %v\n", staticPodPath, err)
 					} else {
 						time.Sleep(1 * time.Second)
 						fmt.Printf("Static pod directory has been removed!\n")
@@ -118,110 +116,57 @@ func NewKubeEdgeReset() *cobra.Command {
 			}
 
 			// 2. Remove containers managed by KubeEdge. Only for edge node.
-			if err := RemoveContainers(isEdgeNode, utilsexec.New()); err != nil {
-				fmt.Printf("Failed to remove containers: %v\n", err)
+			if isEdgeNode {
+				if err := util.RemoveContainers(reset.Endpoint, utilsexec.New()); err != nil {
+					fmt.Printf("Failed to remove containers: %v\n", err)
+				}
 			}
 
 			// 3. Clean stateful directories
-			if err := cleanDirectories(isEdgeNode); err != nil {
+			if err := util.CleanDirectories(isEdgeNode); err != nil {
 				return err
 			}
 
-			// cleanup mqtt container
-			if err := RemoveMqttContainer(reset.RuntimeType, reset.Endpoint, ""); err != nil {
-				fmt.Printf("Failed to remove MQTT container: %v\n", err)
-			}
 			//4. TODO: clean status information
 
 			return nil
 		},
 	}
-
+	edgeCmd := edge.NewOtherEdgeReset()
+	cloudCmd := cloud.NewCloudReset()
+	cmd.AddCommand(edgeCmd)
+	cmd.AddCommand(cloudCmd)
 	addResetFlags(cmd, reset)
 	return cmd
 }
 
-func RemoveMqttContainer(runtimeType, endpoint, cgroupDriver string) error {
-	runtime, err := util.NewContainerRuntime(runtimeType, endpoint, cgroupDriver)
-	if err != nil {
-		return fmt.Errorf("failed to new container runtime: %v", err)
-	}
-
-	return runtime.RemoveMQTT()
+func addResetFlags(cmd *cobra.Command, resetOpts *common.ResetOptions) {
+	cmd.Flags().StringVar(&resetOpts.Kubeconfig, common.FlagNameKubeConfig, common.DefaultKubeConfig,
+		"Use this key to set kube-config path, eg: $HOME/.kube/config")
+	cmd.Flags().BoolVar(&resetOpts.Force, "force", resetOpts.Force,
+		"Reset the node without prompting for confirmation")
 }
 
 // TearDownKubeEdge will bring down either cloud or edge components,
 // depending upon in which type of node it is executed
 func TearDownKubeEdge(isEdgeNode bool, kubeConfig string) error {
 	var ke common.ToolsInstaller
+	if isEdgeNode {
+		ke = &util.KubeEdgeInstTool{Common: util.Common{}}
+		err := ke.TearDown()
+		if err != nil {
+			return fmt.Errorf("TearDown failed, err:%v", err)
+		}
+	}
+
 	ke = &helm.KubeCloudHelmInstTool{
 		Common: util.Common{
 			KubeConfig: kubeConfig,
 		},
 	}
-	if isEdgeNode {
-		ke = &util.KubeEdgeInstTool{Common: util.Common{}}
-	}
-
 	err := ke.TearDown()
 	if err != nil {
 		return fmt.Errorf("TearDown failed, err:%v", err)
 	}
 	return nil
-}
-
-// RemoveContainers removes all Kubernetes-managed containers
-func RemoveContainers(isEdgeNode bool, execer utilsexec.Interface) error {
-	if !isEdgeNode {
-		return nil
-	}
-
-	criSocketPath, err := utilruntime.DetectCRISocket()
-	if err != nil {
-		return err
-	}
-
-	containerRuntime, err := utilruntime.NewContainerRuntime(execer, criSocketPath)
-	if err != nil {
-		return err
-	}
-
-	containers, err := containerRuntime.ListKubeContainers()
-	if err != nil {
-		return err
-	}
-
-	return containerRuntime.RemoveContainers(containers)
-}
-
-func cleanDirectories(isEdgeNode bool) error {
-	var dirToClean = []string{
-		util.KubeEdgePath,
-		util.KubeEdgeLogPath,
-		util.KubeEdgeSocketPath,
-		util.EdgeRootDir,
-	}
-
-	if isEdgeNode {
-		dirToClean = append(dirToClean, "/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
-	}
-
-	for _, dir := range dirToClean {
-		if err := phases.CleanDir(dir); err != nil {
-			fmt.Printf("Failed to delete directory %s: %v\n", dir, err)
-		}
-	}
-
-	return nil
-}
-
-func addResetFlags(cmd *cobra.Command, resetOpts *common.ResetOptions) {
-	cmd.Flags().StringVar(&resetOpts.Kubeconfig, common.KubeConfig, resetOpts.Kubeconfig,
-		"Use this key to set kube-config path, eg: $HOME/.kube/config")
-	cmd.Flags().BoolVar(&resetOpts.Force, "force", resetOpts.Force,
-		"Reset the node without prompting for confirmation")
-	cmd.Flags().StringVar(&resetOpts.RuntimeType, common.RuntimeType, resetOpts.RuntimeType,
-		"Use this key to set container runtime")
-	cmd.Flags().StringVar(&resetOpts.Endpoint, common.RemoteRuntimeEndpoint, resetOpts.Endpoint,
-		"Use this key to set container runtime endpoint")
 }

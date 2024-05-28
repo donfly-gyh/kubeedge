@@ -37,11 +37,13 @@ import (
 	"github.com/kubeedge/kubeedge/common/constants"
 	messagepkg "github.com/kubeedge/kubeedge/edge/pkg/common/message"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/modules"
+	deviceconfig "github.com/kubeedge/kubeedge/edge/pkg/devicetwin/config"
 	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dmiclient"
 	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtcommon"
 	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
 	"github.com/kubeedge/kubeedge/pkg/apis/devices/v1beta1"
 	pb "github.com/kubeedge/kubeedge/pkg/apis/dmi/v1beta1"
+	"github.com/kubeedge/kubeedge/pkg/util"
 )
 
 const (
@@ -91,19 +93,17 @@ func (s *server) MapperRegister(ctx context.Context, in *pb.MapperRegisterReques
 	var deviceList []*pb.Device
 	var deviceModelList []*pb.DeviceModel
 	s.dmiCache.DeviceMu.Lock()
-	defer s.dmiCache.DeviceMu.Unlock()
 	for _, device := range s.dmiCache.DeviceList {
-		protocol := device.Spec.Protocol.ProtocolName
-
-		if protocol == in.Mapper.Protocol {
+		if device.Spec.Protocol.ProtocolName == in.Mapper.Protocol {
 			dev, err := dtcommon.ConvertDevice(device)
 			if err != nil {
 				klog.Errorf("fail to convert device %s with err: %v", device.Name, err)
 				continue
 			}
+			modelID := util.GetResourceID(device.Namespace, device.Spec.DeviceModelRef.Name)
 
 			s.dmiCache.DeviceModelMu.Lock()
-			model, ok := s.dmiCache.DeviceModelList[device.Spec.DeviceModelRef.Name]
+			model, ok := s.dmiCache.DeviceModelList[modelID]
 			s.dmiCache.DeviceModelMu.Unlock()
 			if !ok {
 				klog.Errorf("fail to get device model %s in deviceModelList", device.Spec.DeviceModelRef.Name)
@@ -118,6 +118,8 @@ func (s *server) MapperRegister(ctx context.Context, in *pb.MapperRegisterReques
 			deviceModelList = append(deviceModelList, dm)
 		}
 	}
+	s.dmiCache.DeviceMu.Unlock()
+
 	dmiclient.DMIClientsImp.CreateDMIClient(in.Mapper.Protocol, string(in.Mapper.Address))
 
 	return &pb.MapperRegisterResponse{
@@ -131,20 +133,25 @@ func (s *server) ReportDeviceStatus(ctx context.Context, in *pb.ReportDeviceStat
 		return nil, fmt.Errorf("fail to report device status because of too many request: %s", in.DeviceName)
 	}
 
-	for _, twin := range in.ReportedDevice.Twins {
-		msg, err := CreateMessageTwinUpdate(twin)
-		if err != nil {
-			klog.Errorf("fail to create message data for property %s of device %s with err: %v", twin.PropertyName, in.DeviceName, err)
-			return nil, err
+	if in != nil && in.ReportedDevice != nil && in.ReportedDevice.Twins != nil {
+		for _, twin := range in.ReportedDevice.Twins {
+			msg, err := CreateMessageTwinUpdate(twin)
+			if err != nil {
+				klog.Errorf("fail to create message data for property %s of device %s with err: %v", twin.PropertyName, in.DeviceName, err)
+				return nil, err
+			}
+			handleDeviceTwin(in, msg)
 		}
-		handleDeviceTwin(in.DeviceName, msg)
+	} else {
+		return &pb.ReportDeviceStatusResponse{}, fmt.Errorf("ReportDeviceStatusRequest does not have twin data")
 	}
 
 	return &pb.ReportDeviceStatusResponse{}, nil
 }
 
-func handleDeviceTwin(deviceName string, payload []byte) {
-	topic := dtcommon.DeviceETPrefix + deviceName + dtcommon.TwinETUpdateSuffix
+func handleDeviceTwin(in *pb.ReportDeviceStatusRequest, payload []byte) {
+	deviceID := util.GetResourceID(in.DeviceNamespace, in.DeviceName)
+	topic := dtcommon.DeviceETPrefix + deviceID + dtcommon.TwinETUpdateSuffix
 	target := modules.TwinGroup
 	resource := base64.URLEncoding.EncodeToString([]byte(topic))
 	// routing key will be $hw.<project_id>.events.user.bus.response.cluster.<cluster_id>.node.<node_id>.<base64_topic>
@@ -169,13 +176,19 @@ func CreateMessageTwinUpdate(twin *pb.Twin) ([]byte, error) {
 }
 
 func StartDMIServer(cache *DMICache) {
-	err := initSock(SockPath)
+	var DMISockPath string
+	if deviceconfig.Get().DeviceTwin.DMISockPath != "" {
+		DMISockPath = deviceconfig.Get().DeviceTwin.DMISockPath
+	} else {
+		DMISockPath = SockPath
+	}
+	err := initSock(DMISockPath)
 	if err != nil {
 		klog.Fatalf("failed to remove uds socket with err: %v", err)
 		return
 	}
 
-	lis, err := net.Listen(deviceconst.UnixNetworkType, SockPath)
+	lis, err := net.Listen(deviceconst.UnixNetworkType, DMISockPath)
 	if err != nil {
 		klog.Errorf("failed to start DMI Server with err: %v", err)
 		return

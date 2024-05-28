@@ -13,8 +13,8 @@ import (
 	"github.com/kubeedge/kubeedge/edge/pkg/edgehub/certificate"
 	"github.com/kubeedge/kubeedge/edge/pkg/edgehub/clients"
 	"github.com/kubeedge/kubeedge/edge/pkg/edgehub/config"
-	// register Upgrade handler
-	_ "github.com/kubeedge/kubeedge/edge/pkg/edgehub/upgrade"
+	// register Task handler
+	_ "github.com/kubeedge/kubeedge/edge/pkg/edgehub/task"
 	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha2"
 )
 
@@ -37,9 +37,8 @@ func GetCertSyncChannel() map[string]chan bool {
 }
 
 func NewCertSyncChannel() map[string]chan bool {
-	certSync = make(map[string]chan bool, 2)
+	certSync = make(map[string]chan bool, 1)
 	certSync[modules.EdgeStreamModuleName] = make(chan bool, 1)
-	certSync[modules.MetaManagerModuleName] = make(chan bool, 1)
 	return certSync
 }
 

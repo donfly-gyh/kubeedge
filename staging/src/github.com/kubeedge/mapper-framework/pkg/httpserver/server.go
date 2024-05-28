@@ -4,14 +4,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
 
-	"github.com/kubeedge/Template/pkg/global"
+	"github.com/kubeedge/mapper-framework/pkg/global"
 )
 
 type RestServer struct {
@@ -30,10 +30,14 @@ type RestServer struct {
 
 type Option func(server *RestServer)
 
-func NewRestServer(devPanel global.DevPanel, options ...Option) *RestServer {
+func NewRestServer(devPanel global.DevPanel, httpPort string, options ...Option) *RestServer {
+	if httpPort == "" {
+		httpPort = "7777"
+	}
+
 	rest := &RestServer{
 		IP:           "0.0.0.0",
-		Port:         "7777",
+		Port:         httpPort,
 		Router:       mux.NewRouter(),
 		WriteTimeout: 10 * time.Second,
 		ReadTimeout:  10 * time.Second,
@@ -74,7 +78,7 @@ func (rs *RestServer) StartServer() {
 		klog.V(3).Info("mtls communication, please provide client-key and client-cert to access service")
 		// Configure the server to trust TLS client cert issued by your CA.
 		certPool := x509.NewCertPool()
-		if caCertPEM, err := ioutil.ReadFile(rs.CaCertFilePath); err != nil {
+		if caCertPEM, err := os.ReadFile(rs.CaCertFilePath); err != nil {
 			klog.Errorf("Error loading ca certificate file: %v", err)
 			return
 		} else if ok := certPool.AppendCertsFromPEM(caCertPEM); !ok {
@@ -102,7 +106,6 @@ func (rs *RestServer) sendResponse(
 	request *http.Request,
 	response interface{},
 	statusCode int) {
-
 	correlationID := request.Header.Get(CorrelationHeader)
 	if correlationID != "" {
 		writer.Header().Set(CorrelationHeader, correlationID)

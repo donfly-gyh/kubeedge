@@ -45,13 +45,14 @@ import (
 	"github.com/kubeedge/kubeedge/cloud/pkg/common/informers"
 	"github.com/kubeedge/kubeedge/cloud/pkg/common/modules"
 	"github.com/kubeedge/kubeedge/cloud/pkg/common/monitor"
+	"github.com/kubeedge/kubeedge/cloud/pkg/csrapprovercontroller"
 	"github.com/kubeedge/kubeedge/cloud/pkg/devicecontroller"
 	"github.com/kubeedge/kubeedge/cloud/pkg/dynamiccontroller"
 	"github.com/kubeedge/kubeedge/cloud/pkg/edgecontroller"
-	"github.com/kubeedge/kubeedge/cloud/pkg/nodeupgradejobcontroller"
 	"github.com/kubeedge/kubeedge/cloud/pkg/policycontroller"
 	"github.com/kubeedge/kubeedge/cloud/pkg/router"
 	"github.com/kubeedge/kubeedge/cloud/pkg/synccontroller"
+	"github.com/kubeedge/kubeedge/cloud/pkg/taskmanager"
 	"github.com/kubeedge/kubeedge/common/constants"
 	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/cloudcore/v1alpha1"
 	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/cloudcore/v1alpha1/validation"
@@ -112,11 +113,16 @@ kubernetes controller which manages devices so that the device metadata/status d
 				updateCloudCoreConfigMap(config)
 			}
 
+			ctx := beehiveContext.GetContext()
+			if features.DefaultFeatureGate.Enabled(features.RequireAuthorization) {
+				go csrapprovercontroller.NewCSRApprover(client.GetKubeClient(), informers.GetInformersManager().GetKubeInformerFactory().Certificates().V1().CertificateSigningRequests()).
+					Run(5, ctx.Done())
+			}
+
 			gis := informers.GetInformersManager()
 
 			registerModules(config)
 
-			ctx := beehiveContext.GetContext()
 			if config.Modules.IptablesManager == nil || config.Modules.IptablesManager.Enable && config.Modules.IptablesManager.Mode == v1alpha1.InternalMode {
 				// By default, IptablesManager manages tunnel port related iptables rules
 				// The internal mode will share the host network, forward to the stream port.
@@ -158,7 +164,7 @@ func registerModules(c *v1alpha1.CloudCoreConfig) {
 	cloudhub.Register(c.Modules.CloudHub)
 	edgecontroller.Register(c.Modules.EdgeController)
 	devicecontroller.Register(c.Modules.DeviceController)
-	nodeupgradejobcontroller.Register(c.Modules.NodeUpgradeJobController)
+	taskmanager.Register(c.Modules.TaskManager)
 	synccontroller.Register(c.Modules.SyncController)
 	cloudstream.Register(c.Modules.CloudStream, c.CommonConfig)
 	router.Register(c.Modules.Router)

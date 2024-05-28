@@ -19,7 +19,7 @@
 | Tina Tsou           | @tinatsou         | Arm          | <tina.tsou@arm.com> |
 | Yin Ding            | @dingyin          | Google       | <dingyin@gmail.com> |
 
-[KubeEdge Technical Steering Committee Charter](https://github.com/kubeedge/community/blob/master/commitee-technical-steering/charter.md)
+[KubeEdge Technical Steering Committee Charter](https://github.com/kubeedge/community/blob/master/committee-technical-steering/charter.md)
 describes the mission, scope, and objectives of the KubeEdge Technical Steering Committee..
 
 ## Maintainers
@@ -33,7 +33,9 @@ describes the mission, scope, and objectives of the KubeEdge Technical Steering 
 | Sanil Kumar         | @skdwriting       | Huawei        | <sanil.kumar@huawei.com> |
 | Siddharth Bhadri    | @sids-b           | Infoblox      | <sbhadri@infoblox.com> |
 | Qi Zhang            | @qizha            | Huawei        | <zhangqi21@huawei.com> |
+| Wei Hu              | @willardhu        | DaoCloud      | <wei.hu@daocloud.io> |
 | Yin Ding            | @dingyin          | Google        | <dingyin@gmail.com> |
+| Yue Bao             | @Shelley-BaoYue   | Huawei        | <baoyue2@huawei.com> |
 | Zefeng (Kevin) Wang | @kevin-wangzefeng | Huawei        | <wangzefeng@huawei.com> |
 | Zhe Gong            | @GsssC            | HarmonyCloud  | <zhiyi375@gmail.com> |
 

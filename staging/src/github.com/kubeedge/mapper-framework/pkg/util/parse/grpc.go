@@ -2,12 +2,11 @@ package parse
 
 import (
 	"encoding/json"
-	"errors"
 
 	"k8s.io/klog/v2"
 
-	"github.com/kubeedge/Template/pkg/common"
-	dmiapi "github.com/kubeedge/Template/pkg/dmi-api"
+	dmiapi "github.com/kubeedge/kubeedge/pkg/apis/dmi/v1beta1"
+	"github.com/kubeedge/mapper-framework/pkg/common"
 )
 
 type TwinResultResponse struct {
@@ -16,27 +15,7 @@ type TwinResultResponse struct {
 }
 
 func getProtocolNameFromGrpc(device *dmiapi.Device) (string, error) {
-
 	return device.Spec.Protocol.ProtocolName, nil
-}
-
-func getPushMethodFromGrpc(visitor *dmiapi.DeviceProperty) (string, error) {
-	// TODO add more push method
-	if visitor.PushMethod.Http != nil {
-		return "http", nil
-	}
-	if visitor.PushMethod.Mqtt != nil {
-		return "mqtt", nil
-	}
-	return "", errors.New("can not parse publish method")
-}
-
-func getDBMethodFromGrpc(visitor *dmiapi.DeviceProperty) (string, error) {
-	// TODO add more dbMethod
-	if visitor.PushMethod.DBMethod.Influxdb2 != nil {
-		return "influx", nil
-	}
-	return "", errors.New("can not parse dbMethod")
 }
 
 func BuildProtocolFromGrpc(device *dmiapi.Device) (common.ProtocolConfig, error) {
@@ -72,26 +51,18 @@ func BuildProtocolFromGrpc(device *dmiapi.Device) (common.ProtocolConfig, error)
 }
 
 func buildTwinsFromGrpc(device *dmiapi.Device) []common.Twin {
-	if len(device.Status.Twins) == 0 {
+	if len(device.Spec.Properties) == 0 {
 		return nil
 	}
-	res := make([]common.Twin, 0, len(device.Status.Twins))
-	for _, twin := range device.Status.Twins {
+	res := make([]common.Twin, 0, len(device.Spec.Properties))
+	for _, property := range device.Spec.Properties {
 		cur := common.Twin{
-			PropertyName: twin.PropertyName,
-
+			PropertyName: property.Name,
 			ObservedDesired: common.TwinProperty{
-				Value: twin.ObservedDesired.Value,
+				Value: property.Desired.Value,
 				Metadata: common.Metadata{
-					Timestamp: twin.ObservedDesired.Metadata["timestamp"],
-					Type:      twin.ObservedDesired.Metadata["type"],
-				},
-			},
-			Reported: common.TwinProperty{
-				Value: twin.Reported.Value,
-				Metadata: common.Metadata{
-					Timestamp: twin.ObservedDesired.Metadata["timestamp"],
-					Type:      twin.ObservedDesired.Metadata["type"],
+					Timestamp: property.Desired.Metadata["timestamp"],
+					Type:      property.Desired.Metadata["type"],
 				},
 			},
 		}
@@ -111,7 +82,6 @@ func buildPropertiesFromGrpc(device *dmiapi.Device) []common.DeviceProperty {
 	res := make([]common.DeviceProperty, 0, len(device.Spec.Properties))
 	klog.V(3).Infof("In buildPropertiesFromGrpc, PropertyVisitors = %v", device.Spec.Properties)
 	for _, pptv := range device.Spec.Properties {
-
 		// get visitorConfig filed by grpc device instance
 		var visitorConfig []byte
 		recvAdapter := make(map[string]interface{})
@@ -131,66 +101,96 @@ func buildPropertiesFromGrpc(device *dmiapi.Device) []common.DeviceProperty {
 			return nil
 		}
 
-		// get dbMethod filed by grpc device instance
+		// get the whole pushmethod filed by grpc device instance
 		var dbMethodName string
 		var dbconfig common.DBConfig
-		if pptv.PushMethod.DBMethod != nil {
-			dbMethodName, err = getDBMethodFromGrpc(pptv)
-			if err != nil {
-				klog.Errorf("err: %+v", err)
-				return nil
-			}
-			switch dbMethodName {
-			case "influx":
+		var pushMethod []byte
+		var pushMethodName string
+		if pptv.PushMethod != nil && pptv.PushMethod.DBMethod != nil {
+			//parse dbmethod filed
+			switch {
+			case pptv.PushMethod.DBMethod.Influxdb2 != nil:
+				dbMethodName = "influx"
 				clientconfig, err := json.Marshal(pptv.PushMethod.DBMethod.Influxdb2.Influxdb2ClientConfig)
 				if err != nil {
-					klog.Errorf("err: %+v", err)
+					klog.Errorf("influx client config err: %+v", err)
 					return nil
 				}
 				dataconfig, err := json.Marshal(pptv.PushMethod.DBMethod.Influxdb2.Influxdb2DataConfig)
 				if err != nil {
-					klog.Errorf("err: %+v", err)
+					klog.Errorf("influx data config err: %+v", err)
 					return nil
 				}
 				dbconfig = common.DBConfig{
 					Influxdb2ClientConfig: clientconfig,
 					Influxdb2DataConfig:   dataconfig,
 				}
+			case pptv.PushMethod.DBMethod.Redis != nil:
+				dbMethodName = "redis"
+				clientConfig, err := json.Marshal(pptv.PushMethod.DBMethod.Redis.RedisClientConfig)
+				if err != nil {
+					klog.Errorf("redis config err: %+v", err)
+					return nil
+				}
+				dbconfig = common.DBConfig{
+					RedisClientConfig: clientConfig,
+				}
+			case pptv.PushMethod.DBMethod.Tdengine != nil:
+				dbMethodName = "tdengine"
+				clientConfig, err := json.Marshal(pptv.PushMethod.DBMethod.Tdengine.TdEngineClientConfig)
+				if err != nil {
+					klog.Errorf("tdengine config err: %+v", err)
+					return nil
+				}
+				dbconfig = common.DBConfig{
+					TDEngineClientConfig: clientConfig,
+				}
+			case pptv.PushMethod.DBMethod.Mysql != nil:
+				dbMethodName = "mysql"
+				clientConfig, err := json.Marshal(pptv.PushMethod.DBMethod.Mysql.MysqlClientConfig)
+				if err != nil {
+					klog.Errorf("mysql config err: %+v", err)
+					return nil
+				}
+				dbconfig = common.DBConfig{
+					MySQLClientConfig: clientConfig,
+				}
+			default:
+				klog.Errorf("get DBMethod err: Unsupported database type")
 			}
 		}
-
-		// get pushMethod filed by grpc device instance
-		pushMethodName, err := getPushMethodFromGrpc(pptv)
-		if err != nil {
-			klog.Errorf("err: %+v", err)
-			return nil
-		}
-		var pushMethod []byte
-		switch pushMethodName {
-		case "http":
-			pushMethod, err = json.Marshal(pptv.PushMethod.Http)
-			if err != nil {
-				klog.Errorf("err: %+v", err)
-				return nil
-			}
-		case "mqtt":
-			pushMethod, err = json.Marshal(pptv.PushMethod.Mqtt)
-			if err != nil {
-				klog.Errorf("err: %+v", err)
-				return nil
+		if pptv.PushMethod != nil {
+			//parse pushmethod filed
+			switch {
+			case pptv.PushMethod.Http != nil:
+				pushMethodName = common.PushMethodHTTP
+				pushMethod, err = json.Marshal(pptv.PushMethod.Http)
+				if err != nil {
+					klog.Errorf("err: %+v", err)
+					return nil
+				}
+			case pptv.PushMethod.Mqtt != nil:
+				pushMethodName = common.PushMethodMQTT
+				pushMethod, err = json.Marshal(pptv.PushMethod.Mqtt)
+				if err != nil {
+					klog.Errorf("err: %+v", err)
+					return nil
+				}
+			default:
+				klog.Errorf("get PushMethod err: Unsupported pushmethod type")
 			}
 		}
 
 		// get the final Properties
 		cur := common.DeviceProperty{
-			Name:         pptv.GetName(),
-			PropertyName: pptv.GetName(),
-			ModelName:    device.Spec.DeviceModelReference,
-			CollectCycle: pptv.GetCollectCycle(),
-			ReportCycle:  pptv.GetReportCycle(),
+			Name:          pptv.GetName(),
+			PropertyName:  pptv.GetName(),
+			ModelName:     device.Spec.DeviceModelReference,
+			CollectCycle:  pptv.GetCollectCycle(),
+			ReportCycle:   pptv.GetReportCycle(),
 			ReportToCloud: pptv.GetReportToCloud(),
-			Protocol:     protocolName,
-			Visitors:     visitorConfig,
+			Protocol:      protocolName,
+			Visitors:      visitorConfig,
 			PushMethod: common.PushMethodConfig{
 				MethodName:   pushMethodName,
 				MethodConfig: pushMethod,
@@ -201,14 +201,16 @@ func buildPropertiesFromGrpc(device *dmiapi.Device) []common.DeviceProperty {
 			},
 		}
 		res = append(res, cur)
-
 	}
+
 	return res
 }
 
-func ParseDeviceModelFromGrpc(model *dmiapi.DeviceModel) common.DeviceModel {
+func GetDeviceModelFromGrpc(model *dmiapi.DeviceModel) common.DeviceModel {
 	cur := common.DeviceModel{
-		Name: model.GetName(),
+		ID:        GetResourceID(model.GetNamespace(), model.GetName()),
+		Name:      model.GetName(),
+		Namespace: model.GetNamespace(),
 	}
 	if model.GetSpec() == nil || len(model.GetSpec().GetProperties()) == 0 {
 		return cur
@@ -218,11 +220,11 @@ func ParseDeviceModelFromGrpc(model *dmiapi.DeviceModel) common.DeviceModel {
 		p := common.ModelProperty{
 			Name:        property.GetName(),
 			Description: property.GetDescription(),
-			DataType:    property.Type,
-			AccessMode:  property.AccessMode,
-			Minimum:     property.Minimum,
-			Maximum:     property.Maximum,
-			Unit:        property.Unit,
+			DataType:    property.GetType(),
+			AccessMode:  property.GetAccessMode(),
+			Minimum:     property.GetMinimum(),
+			Maximum:     property.GetMaximum(),
+			Unit:        property.GetUnit(),
 		}
 		properties = append(properties, p)
 	}
@@ -230,23 +232,23 @@ func ParseDeviceModelFromGrpc(model *dmiapi.DeviceModel) common.DeviceModel {
 	return cur
 }
 
-func ParseDeviceFromGrpc(device *dmiapi.Device, commonModel *common.DeviceModel) (*common.DeviceInstance, error) {
-
+func GetDeviceFromGrpc(device *dmiapi.Device, commonModel *common.DeviceModel) (*common.DeviceInstance, error) {
 	protocolName, err := getProtocolNameFromGrpc(device)
 	if err != nil {
 		return nil, err
 	}
 	instance := &common.DeviceInstance{
-		ID:           device.GetName(),
+		ID:           GetResourceID(device.GetNamespace(), device.GetName()),
 		Name:         device.GetName(),
+		Namespace:    device.GetNamespace(),
 		ProtocolName: protocolName + "-" + device.GetName(),
-		Model:        device.Spec.DeviceModelReference,
+		Model:        device.GetSpec().GetDeviceModelReference(),
 		Twins:        buildTwinsFromGrpc(device),
 		Properties:   buildPropertiesFromGrpc(device),
 	}
 	// copy Properties to twin
 	propertiesMap := make(map[string]common.DeviceProperty)
-	for i := 0; i < len(instance.Properties); i++ {
+	for i := range instance.Properties {
 		if commonModel == nil {
 			klog.Errorf("commonModel == nil")
 			continue
@@ -261,11 +263,16 @@ func ParseDeviceFromGrpc(device *dmiapi.Device, commonModel *common.DeviceModel)
 		}
 		propertiesMap[instance.Properties[i].PProperty.Name] = instance.Properties[i]
 	}
-	for i := 0; i < len(instance.Twins); i++ {
+	for i := range instance.Twins {
 		if v, ok := propertiesMap[instance.Twins[i].PropertyName]; ok {
 			instance.Twins[i].Property = &v
 		}
 	}
 	klog.V(2).Infof("final instance data from grpc = %v", instance)
 	return instance, nil
+}
+
+// GetResourceID return resource ID
+func GetResourceID(namespace, name string) string {
+	return namespace + "/" + name
 }

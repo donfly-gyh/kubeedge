@@ -36,6 +36,7 @@ import (
 
 	hubconfig "github.com/kubeedge/kubeedge/cloud/pkg/cloudhub/config"
 	"github.com/kubeedge/kubeedge/common/constants"
+	"github.com/kubeedge/kubeedge/common/types"
 )
 
 // StartHTTPServer starts the http service
@@ -46,6 +47,7 @@ func StartHTTPServer() {
 	ws.Route(ws.GET(constants.DefaultCertURL).To(edgeCoreClientCert))
 	ws.Route(ws.GET(constants.DefaultCAURL).To(getCA))
 	ws.Route(ws.POST(constants.DefaultNodeUpgradeURL).To(upgradeEdge))
+	ws.Route(ws.POST(constants.DefaultTaskStateReportURL).To(reportTaskStatus))
 	serverContainer.Add(ws)
 
 	addr := fmt.Sprintf("%s:%d", hubconfig.Config.HTTPS.Address, hubconfig.Config.HTTPS.Port)
@@ -86,9 +88,10 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 
 // edgeCoreClientCert will verify the certificate of EdgeCore or token then create EdgeCoreCert and return it
 func edgeCoreClientCert(request *restful.Request, response *restful.Response) {
+	nodeName := request.Request.Header.Get(types.NodeNameKey)
 	if cert := request.Request.TLS.PeerCertificates; len(cert) > 0 {
-		if err := verifyCert(cert[0]); err != nil {
-			klog.Errorf("failed to sign the certificate for edgenode: %s, failed to verify the certificate", request.Request.Header.Get(constants.NodeName))
+		if err := verifyCert(cert[0], nodeName); err != nil {
+			klog.Errorf("failed to sign the certificate for edgenode: %s, failed to verify the certificate", nodeName)
 			response.WriteHeader(http.StatusUnauthorized)
 			if _, err := response.Write([]byte(err.Error())); err != nil {
 				klog.Errorf("failed to write response, err: %v", err)
@@ -101,12 +104,12 @@ func edgeCoreClientCert(request *restful.Request, response *restful.Response) {
 	if verifyAuthorization(response, request.Request) {
 		signEdgeCert(response, request.Request)
 	} else {
-		klog.Errorf("failed to sign the certificate for edgenode: %s, invalid token", request.Request.Header.Get(constants.NodeName))
+		klog.Errorf("failed to sign the certificate for edgenode: %s, invalid token", nodeName)
 	}
 }
 
 // verifyCert verifies the edge certificate by CA certificate when edge certificates rotate.
-func verifyCert(cert *x509.Certificate) error {
+func verifyCert(cert *x509.Certificate, nodeName string) error {
 	roots := x509.NewCertPool()
 	ok := roots.AppendCertsFromPEM(pem.EncodeToMemory(&pem.Block{Type: certutil.CertificateBlockType, Bytes: hubconfig.Config.Ca}))
 	if !ok {
@@ -119,7 +122,20 @@ func verifyCert(cert *x509.Certificate) error {
 	if _, err := cert.Verify(opts); err != nil {
 		return fmt.Errorf("failed to verify edge certificate: %v", err)
 	}
-	return nil
+	return verifyCertSubject(cert, nodeName)
+}
+
+func verifyCertSubject(cert *x509.Certificate, nodeName string) error {
+	if cert.Subject.Organization[0] == "KubeEdge" && cert.Subject.CommonName == "kubeedge.io" {
+		// In order to maintain compatibility with older versions of certificates
+		// this condition will be removed in KubeEdge v1.18.
+		return nil
+	}
+	commonName := fmt.Sprintf("system:node:%s", nodeName)
+	if cert.Subject.Organization[0] == "system:nodes" && cert.Subject.CommonName == commonName {
+		return nil
+	}
+	return fmt.Errorf("request node name is not match with the certificate")
 }
 
 // verifyAuthorization verifies the token from EdgeCore CSR
@@ -177,12 +193,12 @@ func signEdgeCert(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, constants.MaxRespBodyLength)
 	csrContent, err := io.ReadAll(r.Body)
 	if err != nil {
-		klog.Errorf("fail to read file when signing the cert for edgenode:%s! error:%v", r.Header.Get(constants.NodeName), err)
+		klog.Errorf("fail to read file when signing the cert for edgenode:%s! error:%v", r.Header.Get(types.NodeNameKey), err)
 		return
 	}
 	csr, err := x509.ParseCertificateRequest(csrContent)
 	if err != nil {
-		klog.Errorf("fail to ParseCertificateRequest of edgenode: %s! error:%v", r.Header.Get(constants.NodeName), err)
+		klog.Errorf("fail to ParseCertificateRequest of edgenode: %s! error:%v", r.Header.Get(types.NodeNameKey), err)
 		return
 	}
 	usagesStr := r.Header.Get("ExtKeyUsages")
@@ -199,7 +215,7 @@ func signEdgeCert(w http.ResponseWriter, r *http.Request) {
 	klog.V(4).Infof("receive sign crt request, ExtKeyUsages: %v", usages)
 	clientCertDER, err := signCerts(csr.Subject, csr.PublicKey, usages)
 	if err != nil {
-		klog.Errorf("fail to signCerts for edgenode:%s! error:%v", r.Header.Get(constants.NodeName), err)
+		klog.Errorf("fail to signCerts for edgenode:%s! error:%v", r.Header.Get(types.NodeNameKey), err)
 		return
 	}
 

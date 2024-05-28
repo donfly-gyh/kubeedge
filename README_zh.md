@@ -1,9 +1,7 @@
 # KubeEdge
-[![Build Status](https://travis-ci.org/kubeedge/kubeedge.svg?branch=master)](https://travis-ci.org/kubeedge/kubeedge)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeedge/kubeedge)](https://goreportcard.com/report/github.com/kubeedge/kubeedge)
 [![LICENSE](https://img.shields.io/github/license/kubeedge/kubeedge.svg?style=flat-square)](/LICENSE)
 [![Releases](https://img.shields.io/github/release/kubeedge/kubeedge/all.svg?style=flat-square)](https://github.com/kubeedge/kubeedge/releases)
-[![Documentation Status](https://readthedocs.org/projects/kubeedge/badge/?version=latest)](https://kubeedge.readthedocs.io/en/latest/?badge=latest)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3018/badge)](https://bestpractices.coreinfrastructure.org/projects/3018)
 
 ![logo](./docs/images/KubeEdge_logo.png)
@@ -60,13 +58,14 @@ KubeEdge 由云端和边缘端部分构成：
 
 ### Kubernetes 版本兼容
 
-|               | Kubernetes 1.20 | Kubernetes 1.21 | Kubernetes 1.22 | Kubernetes 1.23 | Kubernetes 1.24 | Kubernetes 1.25 | Kubernetes 1.26 |
-| ------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
-| KubeEdge 1.12 | ✓               | ✓               | ✓               | -               | -               | -               | -               |
-| KubeEdge 1.13 | +               | ✓               | ✓               | ✓               | -               | -               | -               |
-| KubeEdge 1.14 | +               | +               | ✓               | ✓               | ✓               | -               | -               |
-| KubeEdge 1.15 | +               | +               | +               | +               | ✓               | ✓               | ✓               |
-| KubeEdge HEAD (master) | +               | +               | +               | +               | ✓               | ✓               | ✓               |
+|                        | Kubernetes 1.20 | Kubernetes 1.21 | Kubernetes 1.22 | Kubernetes 1.23 | Kubernetes 1.24 | Kubernetes 1.25 | Kubernetes 1.26 | Kubernetes 1.27 | Kubernetes 1.28 |
+|------------------------| --------------- | --------------- | --------------- | --------------- | --------------- |-----------------| --------------- | --------------- | --------------- |
+| KubeEdge 1.12          | ✓               | ✓               | ✓               | -               | -               | -               | -               | -               | -               |
+| KubeEdge 1.13          | +               | ✓               | ✓               | ✓               | -               | -               | -               | -               | -               |
+| KubeEdge 1.14          | +               | +               | ✓               | ✓               | ✓               | -               | -               | -               | -               |
+| KubeEdge 1.15          | +               | +               | +               | +               | ✓               | ✓               | ✓               | -               | -               |
+| KubeEdge 1.16          | +               | +               | +               | +               | +               | ✓               | ✓               | ✓               | -               |
+| KubeEdge HEAD (master) | +               | +               | +               | +               | +               | +               | ✓               | ✓               | ✓               |
 
 说明：
 * `✓` KubeEdge 和 Kubernetes 的版本是完全兼容的
@@ -83,7 +82,7 @@ KubeEdge 由云端和边缘端部分构成：
 
 ## 路线图
 
-* [2023 Roadmap](https://github.com/kubeedge/community/blob/master/roadmap_zh.md)
+* [2024 Roadmap](https://github.com/kubeedge/community/blob/master/roadmap_zh.md)
 
 ## 社区例会
 
@@ -104,7 +103,7 @@ KubeEdge 由云端和边缘端部分构成：
 如果您有任何疑问，请以下方式与我们联系：
 
 - [mailing list](https://groups.google.com/forum/#!forum/kubeedge)
-- [slack](https://join.slack.com/t/kubeedge/shared_invite/enQtNjc0MTg2NTg2MTk0LWJmOTBmOGRkZWNhMTVkNGU1ZjkwNDY4MTY4YTAwNDAyMjRkMjdlMjIzYmMxODY1NGZjYzc4MWM5YmIxZjU1ZDI)
+- [slack](https://kubeedge.io/docs/community/slack)
 - [twitter](https://twitter.com/kubeedge)
 
 ## 贡献
